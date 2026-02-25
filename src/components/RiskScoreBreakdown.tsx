@@ -124,11 +124,29 @@ export function RiskScoreBreakdown({ score, findings }: RiskScoreBreakdownProps)
           </div>
         )}
 
+        {/* Severity level definitions */}
+        <div className="space-y-2 pt-1">
+          <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">How Severity is Determined</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {[
+              { sev: "Critical", color: "text-severity-critical", desc: "Exposed configs, database tools, sensitive data leaks" },
+              { sev: "High", color: "text-severity-high", desc: "Missing CSP, exposed admin panels, open redirects" },
+              { sev: "Medium", color: "text-severity-medium", desc: "Missing HSTS/X-Frame-Options, XSS input vectors" },
+              { sev: "Low", color: "text-severity-low", desc: "Outdated libraries, excessive external dependencies" },
+            ].map(({ sev, color, desc }) => (
+              <div key={sev} className="flex items-start gap-2 py-1.5 px-2.5 rounded-md bg-secondary/30">
+                <span className={`text-[10px] font-bold ${color} shrink-0 mt-0.5`}>{sev}</span>
+                <span className="text-[10px] text-muted-foreground leading-relaxed">{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Scoring methodology - collapsed */}
         <details className="group">
           <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none flex items-center gap-1">
             <span className="group-open:rotate-90 transition-transform text-[10px]">▶</span>
-            Scoring methodology
+            Scoring formula
           </summary>
           <div className="mt-2 text-[11px] text-muted-foreground leading-relaxed p-3 rounded-lg bg-secondary/40 border border-border space-y-1.5">
             <div>Risk = Σ (count × weight), capped at 100</div>
