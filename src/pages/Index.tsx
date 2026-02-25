@@ -53,24 +53,46 @@ const Dashboard = () => {
 
   return (
     <motion.div className="space-y-8" variants={staggerContainer} initial="initial" animate="animate">
-      <motion.div variants={fadeInUp} className="flex flex-col items-center text-center gap-5 py-10">
-        <motion.img
-          src={threatLensLogo}
-          alt="ThreatLens"
-          className="h-14 w-14 rounded-xl"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-        />
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-gradient-primary">Threat</span>Lens
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-lg text-sm leading-relaxed">
-            Automated threat intelligence & attack surface mapping. Enter a domain to begin reconnaissance.
-          </p>
+      <motion.div variants={fadeInUp} className="relative flex flex-col items-center text-center gap-5 py-16 overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08)_0%,transparent_70%)]" />
+          <motion.div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-primary/5"
+            animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.1, 0.3] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-primary/10"
+            animate={{ scale: [1.1, 1, 1.1], opacity: [0.15, 0.3, 0.15] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          />
+          <motion.div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full bg-primary/5 blur-3xl"
+            animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.2, 0.4] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+          />
         </div>
-        <ScanForm onScanStarted={fetchScans} />
+
+        <div className="relative z-10 flex flex-col items-center gap-5">
+          <motion.img
+            src={threatLensLogo}
+            alt="ThreatLens"
+            className="h-14 w-14"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+          />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              <span className="text-gradient-primary">Threat</span>Lens
+            </h1>
+            <p className="text-muted-foreground mt-2 max-w-lg text-sm leading-relaxed">
+              Automated threat intelligence & attack surface mapping. Enter a domain to begin reconnaissance.
+            </p>
+          </div>
+          <ScanForm onScanStarted={fetchScans} />
+        </div>
       </motion.div>
 
       {/* Stats Grid */}
