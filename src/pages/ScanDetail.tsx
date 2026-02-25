@@ -498,8 +498,14 @@ const ScanDetail = () => {
               </TabsContent>
 
               {/* Raw Data Tab */}
-              <TabsContent value="raw">
+              <TabsContent value="raw" className="space-y-4">
+                <AiSurfaceInsight section="raw_data" data={scan.raw_crawl_data} domain={scan.domain} onAnalysis={handleInsightGenerated} />
                 <Card className="bg-card border-border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                      <Code className="h-3.5 w-3.5 text-primary" /> Raw Crawl Data
+                    </CardTitle>
+                  </CardHeader>
                   <CardContent className="p-4">
                     <pre className="text-xs font-mono text-muted-foreground overflow-auto max-h-96 whitespace-pre-wrap">
                       {JSON.stringify(scan.raw_crawl_data, null, 2)}
