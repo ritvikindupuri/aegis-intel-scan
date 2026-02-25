@@ -403,26 +403,38 @@ const ScanDetail = () => {
                 <AiChatPanel context="surface" contextData={surfaceContextData} domain={scan.domain} onInsight={handleInsightGenerated} />
 
                 {/* Surface overview stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[
-                    { label: "Endpoints", value: (parsed.endpoints || parsed.urls || []).length, icon: Link2, desc: "Discovered paths" },
-                    { label: "JS Files", value: (parsed.jsFiles || []).length, icon: FileCode, desc: "Client-side scripts" },
-                    { label: "Forms", value: (parsed.forms || []).length, icon: FormInput, desc: "Input vectors" },
-                    { label: "External Deps", value: (parsed.externalDependencies || []).length, icon: ExternalLink, desc: "Third-party resources" },
-                  ].map(({ label, value, icon: Icon, desc }) => (
-                    <Card key={label} className="bg-card border-border">
-                      <CardContent className="p-3 flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-secondary">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="text-lg font-mono font-bold">{value}</div>
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{desc}</div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: "Endpoints", value: (parsed.endpoints || parsed.urls || []).length, icon: Link2, desc: "Discovered paths", tip: "All unique URL paths found by crawling the target. Includes pages, API routes, and asset paths. A larger number means a wider attack surface for an adversary to probe." },
+                      { label: "JS Files", value: (parsed.jsFiles || []).length, icon: FileCode, desc: "Client-side scripts", tip: "JavaScript files loaded via <script> tags. These can reveal API keys, internal endpoints, authentication logic, and client-side business rules to attackers." },
+                      { label: "Forms", value: (parsed.forms || []).length, icon: FormInput, desc: "Input vectors", tip: "HTML forms discovered on the target. Each form is a potential injection point for XSS, SQL injection, CSRF, and other input-based attacks." },
+                      { label: "External Deps", value: (parsed.externalDependencies || []).length, icon: ExternalLink, desc: "Third-party resources", tip: "External scripts, stylesheets, and resources loaded from third-party domains. Each dependency is a supply chain risk — a compromised CDN could inject malicious code." },
+                    ].map(({ label, value, icon: Icon, desc, tip }) => (
+                      <Tooltip key={label}>
+                        <TooltipTrigger asChild>
+                          <Card className="bg-card border-border cursor-help">
+                            <CardContent className="p-3 flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-secondary">
+                                <Icon className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <div className="text-lg font-mono font-bold">{value}</div>
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                  {desc}
+                                  <Info className="h-2.5 w-2.5 opacity-40" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[260px] text-xs leading-relaxed">
+                          {tip}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </TooltipProvider>
 
                 {/* Technologies */}
                 <Card className="bg-card border-border">
