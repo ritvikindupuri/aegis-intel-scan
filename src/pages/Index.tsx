@@ -6,6 +6,8 @@ import { ScanForm } from "@/components/ScanForm";
 import { StatusBadge, RiskScoreGauge, SeverityBadge } from "@/components/SeverityBadge";
 import { getScans, type Scan } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
+import { motion } from "framer-motion";
+import { fadeInUp, staggerContainer } from "@/components/PageTransition";
 import spectraLogo from "@/assets/spectra-logo.png";
 
 const Dashboard = () => {
@@ -50,10 +52,17 @@ const Dashboard = () => {
   const recentScans = scans.slice(0, 5);
 
   return (
-    <div className="space-y-8">
+    <motion.div className="space-y-8" variants={staggerContainer} initial="initial" animate="animate">
       {/* Hero */}
-      <div className="flex flex-col items-center text-center gap-5 py-10">
-        <img src={spectraLogo} alt="ThreatLens" className="h-14 w-14 rounded-xl" />
+      <motion.div variants={fadeInUp} className="flex flex-col items-center text-center gap-5 py-10">
+        <motion.img
+          src={spectraLogo}
+          alt="ThreatLens"
+          className="h-14 w-14 rounded-xl"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        />
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             <span className="text-gradient-primary">Threat</span>Lens
@@ -63,10 +72,10 @@ const Dashboard = () => {
           </p>
         </div>
         <ScanForm onScanStarted={fetchScans} />
-      </div>
+      </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: "Total Scans", value: totalScans, icon: Search, color: "text-primary" },
           { label: "Domains", value: uniqueDomains, icon: Globe, color: "text-primary" },
@@ -85,9 +94,9 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </motion.div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <motion.div variants={fadeInUp} className="grid md:grid-cols-3 gap-4">
         <Card className="md:col-span-2 bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
@@ -102,31 +111,38 @@ const Dashboard = () => {
               <div className="p-8 text-center text-muted-foreground text-sm">No scans yet. Start your first scan above.</div>
             ) : (
               <div className="divide-y divide-border">
-                {recentScans.map(scan => (
-                  <Link key={scan.id} to={`/scan/${scan.id}`} className="flex items-center justify-between p-4 hover:bg-secondary/40 transition-all duration-200 group">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-1.5 rounded-md bg-secondary">
-                        <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-mono text-sm truncate">{scan.domain}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(scan.created_at), { addSuffix: true })}
+                {recentScans.map((scan, i) => (
+                  <motion.div
+                    key={scan.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.25 }}
+                  >
+                    <Link to={`/scan/${scan.id}`} className="flex items-center justify-between p-4 hover:bg-secondary/40 transition-all duration-200 group">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-1.5 rounded-md bg-secondary">
+                          <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-mono text-sm truncate">{scan.domain}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(scan.created_at), { addSuffix: true })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <StatusBadge status={scan.status} />
-                      {scan.status === 'completed' && (
-                        <span className={`font-mono text-sm font-bold ${
-                          scan.risk_score >= 75 ? "text-severity-critical" :
-                          scan.risk_score >= 50 ? "text-severity-high" :
-                          scan.risk_score >= 25 ? "text-severity-medium" : "text-severity-low"
-                        }`}>{scan.risk_score}</span>
-                      )}
-                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200" />
-                    </div>
-                  </Link>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <StatusBadge status={scan.status} />
+                        {scan.status === 'completed' && (
+                          <span className={`font-mono text-sm font-bold ${
+                            scan.risk_score >= 75 ? "text-severity-critical" :
+                            scan.risk_score >= 50 ? "text-severity-high" :
+                            scan.risk_score >= 25 ? "text-severity-medium" : "text-severity-low"
+                          }`}>{scan.risk_score}</span>
+                        )}
+                        <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200" />
+                      </div>
+                    </Link>
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -174,8 +190,8 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
