@@ -64,11 +64,14 @@ const Policies = () => {
   const addPolicy = async () => {
     if (!newDomain.trim()) return;
     const clean = newDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
     const { error } = await supabase.from('domain_policies').insert({
       domain: clean,
       policy_type: newPolicy,
       reason: newReason || null,
       ai_evaluated: false,
+      user_id: user.id,
     });
     if (error) {
       toast({ title: "Error", description: error.message.includes('duplicate') ? "Domain already has a policy" : error.message, variant: "destructive" });

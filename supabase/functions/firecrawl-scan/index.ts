@@ -98,7 +98,7 @@ serve(async (req) => {
     if (!currentScanId) {
       const { data: scan, error: insertErr } = await supabase
         .from('scans')
-        .insert({ domain, status: 'crawling' })
+        .insert({ domain, status: 'crawling', user_id: userId })
         .select('id')
         .single();
       if (insertErr) throw insertErr;
