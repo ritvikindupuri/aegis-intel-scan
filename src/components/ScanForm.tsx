@@ -19,7 +19,7 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
     setLoading(true);
     try {
       const { scanId } = await startScan(domain.trim());
-      toast({ title: "Scan started", description: `Crawling ${domain}...` });
+      toast({ title: "Scan initiated", description: `Crawling ${domain}...` });
       onScanStarted?.();
       navigate(`/scan/${scanId}`);
     } catch (err: any) {
@@ -36,12 +36,12 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
         <Input
           value={domain}
           onChange={e => setDomain(e.target.value)}
-          placeholder="Enter domain or URL (e.g. example.com)"
-          className="pl-10 bg-secondary border-border font-mono text-sm"
+          placeholder="Enter domain (e.g. example.com)"
+          className="pl-10 bg-secondary border-border font-mono text-sm h-10"
           disabled={loading}
         />
       </div>
-      <Button type="submit" disabled={loading || !domain.trim()} className="gap-2">
+      <Button type="submit" disabled={loading || !domain.trim()} className="gap-2 h-10 px-5">
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
         {loading ? "Scanning..." : "Scan"}
       </Button>

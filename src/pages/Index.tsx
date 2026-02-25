@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Globe, AlertTriangle, Cpu, Clock, ArrowRight, Search } from "lucide-react";
+import { Globe, AlertTriangle, Cpu, Clock, ArrowRight, Search, Shield } from "lucide-react";
 import { ScanForm } from "@/components/ScanForm";
 import { StatusBadge, RiskScoreGauge, SeverityBadge } from "@/components/SeverityBadge";
 import { getScans, type Scan } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
+import spectraLogo from "@/assets/spectra-logo.png";
 
 const Dashboard = () => {
   const [scans, setScans] = useState<Scan[]>([]);
@@ -24,13 +25,11 @@ const Dashboard = () => {
 
   useEffect(() => { fetchScans(); }, []);
 
-  // Stats
   const totalScans = scans.length;
   const totalVulns = scans.reduce((sum, s) => sum + (s.vulnerabilities_found || 0), 0);
   const avgRisk = totalScans ? Math.round(scans.reduce((sum, s) => sum + (s.risk_score || 0), 0) / totalScans) : 0;
   const uniqueDomains = new Set(scans.map(s => s.domain)).size;
 
-  // Tech breakdown
   const techCounts: Record<string, number> = {};
   for (const s of scans) {
     for (const t of (s.technologies || [])) {
@@ -39,9 +38,7 @@ const Dashboard = () => {
   }
   const topTechs = Object.entries(techCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
-  // Severity distribution from recent scans
   const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  // We'll approximate from risk scores
   for (const s of scans) {
     if (s.risk_score >= 75) severityCounts.critical++;
     else if (s.risk_score >= 50) severityCounts.high++;
@@ -53,35 +50,37 @@ const Dashboard = () => {
   const recentScans = scans.slice(0, 5);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Hero */}
-      <div className="flex flex-col items-center text-center gap-4 py-8">
-        <div className="flex items-center gap-3">
-          <Shield className="h-10 w-10 text-primary" />
+      <div className="flex flex-col items-center text-center gap-5 py-10">
+        <img src={spectraLogo} alt="Spectra" className="h-14 w-14 rounded-xl" />
+        <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-gradient-primary">Aegis</span>Intel
+            <span className="text-gradient-primary">Spec</span>tra
           </h1>
+          <p className="text-muted-foreground mt-2 max-w-lg text-sm leading-relaxed">
+            Automated threat intelligence & attack surface mapping. Enter a domain to begin reconnaissance.
+          </p>
         </div>
-        <p className="text-muted-foreground max-w-md">
-          Automated threat intelligence & attack surface mapping. Enter a domain to begin reconnaissance.
-        </p>
         <ScanForm onScanStarted={fetchScans} />
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: "Total Scans", value: totalScans, icon: Search, color: "text-primary" },
-          { label: "Domains Scanned", value: uniqueDomains, icon: Globe, color: "text-primary" },
+          { label: "Domains", value: uniqueDomains, icon: Globe, color: "text-primary" },
           { label: "Vulnerabilities", value: totalVulns, icon: AlertTriangle, color: "text-accent" },
-          { label: "Avg Risk Score", value: avgRisk, icon: Shield, color: avgRisk >= 50 ? "text-severity-high" : "text-severity-low" },
+          { label: "Avg Risk", value: avgRisk, icon: Shield, color: avgRisk >= 50 ? "text-severity-high" : "text-severity-low" },
         ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="bg-card border-border">
+          <Card key={label} className="bg-card border-border card-hover">
             <CardContent className="p-4 flex items-center gap-3">
-              <Icon className={`h-8 w-8 ${color}`} />
+              <div className="p-2 rounded-lg bg-secondary">
+                <Icon className={`h-5 w-5 ${color}`} />
+              </div>
               <div>
-                <div className="text-2xl font-mono font-bold">{value}</div>
-                <div className="text-xs text-muted-foreground">{label}</div>
+                <div className="text-2xl font-mono font-bold tracking-tight">{value}</div>
+                <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
               </div>
             </CardContent>
           </Card>
@@ -92,22 +91,24 @@ const Dashboard = () => {
         {/* Recent Scans */}
         <Card className="md:col-span-2 bg-card border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
+            <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 text-primary" />
               Recent Scans
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <div className="p-6 text-center text-muted-foreground text-sm">Loading...</div>
+              <div className="p-8 text-center text-muted-foreground text-sm">Loading...</div>
             ) : recentScans.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground text-sm">No scans yet. Start your first scan above.</div>
+              <div className="p-8 text-center text-muted-foreground text-sm">No scans yet. Start your first scan above.</div>
             ) : (
               <div className="divide-y divide-border">
                 {recentScans.map(scan => (
-                  <Link key={scan.id} to={`/scan/${scan.id}`} className="flex items-center justify-between p-4 hover:bg-secondary/50 transition-colors group">
+                  <Link key={scan.id} to={`/scan/${scan.id}`} className="flex items-center justify-between p-4 hover:bg-secondary/40 transition-all duration-200 group">
                     <div className="flex items-center gap-3 min-w-0">
-                      <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="p-1.5 rounded-md bg-secondary">
+                        <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
                       <div className="min-w-0">
                         <div className="font-mono text-sm truncate">{scan.domain}</div>
                         <div className="text-xs text-muted-foreground">
@@ -124,7 +125,7 @@ const Dashboard = () => {
                           scan.risk_score >= 25 ? "text-severity-medium" : "text-severity-low"
                         }`}>{scan.risk_score}</span>
                       )}
-                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200" />
                     </div>
                   </Link>
                 ))}
@@ -135,15 +136,14 @@ const Dashboard = () => {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {/* Severity Distribution */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-accent" />
-                Scan Risk Levels
+              <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-accent" />
+                Risk Distribution
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2.5">
               {Object.entries(severityCounts).map(([sev, count]) => (
                 <div key={sev} className="flex items-center justify-between">
                   <SeverityBadge severity={sev} />
@@ -153,21 +153,20 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Technology Breakdown */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Cpu className="h-4 w-4 text-primary" />
-                Technologies Detected
+              <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                <Cpu className="h-3.5 w-3.5 text-primary" />
+                Technologies
               </CardTitle>
             </CardHeader>
             <CardContent>
               {topTechs.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No data yet</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {topTechs.map(([tech, count]) => (
-                    <span key={tech} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary text-xs font-mono text-secondary-foreground">
+                    <span key={tech} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary text-[11px] font-mono text-secondary-foreground">
                       {tech}
                       <span className="text-muted-foreground">({count})</span>
                     </span>

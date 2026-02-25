@@ -1,5 +1,6 @@
-import { Shield, Activity, Search, BarChart3, Clock, AlertTriangle } from "lucide-react";
+import { Search, BarChart3, Clock } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import spectraLogo from "@/assets/spectra-logo.png";
 
 const navItems = [
   { to: "/", icon: BarChart3, label: "Dashboard" },
@@ -12,27 +13,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="border-b border-border glass sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14 px-4">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="relative">
-              <Shield className="h-7 w-7 text-primary" />
-              <Activity className="h-3 w-3 text-accent absolute -top-0.5 -right-0.5" />
-            </div>
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src={spectraLogo} alt="Spectra" className="h-7 w-7 rounded-md" />
             <span className="text-lg font-bold tracking-tight">
-              <span className="text-gradient-primary">Aegis</span>
-              <span className="text-foreground">Intel</span>
+              <span className="text-gradient-primary">Spec</span>
+              <span className="text-foreground">tra</span>
             </span>
           </Link>
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-0.5">
             {navItems.map(({ to, icon: Icon, label }) => (
               <Link
                 key={to}
                 to={to}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   location.pathname === to
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary/10 text-primary shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                 }`}
               >
@@ -43,7 +40,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      {/* Main */}
       <main className="flex-1 container px-4 py-6">
         {children}
       </main>
