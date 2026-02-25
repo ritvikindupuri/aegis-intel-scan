@@ -1,4 +1,4 @@
-import { BarChart3, Clock, GitCompareArrows, Shield, LogOut } from "lucide-react";
+import { BarChart3, Clock, GitCompareArrows, Shield, LogOut, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ const navItems = [
   { to: "/history", icon: Clock, label: "History" },
   { to: "/compare", icon: GitCompareArrows, label: "Compare" },
   { to: "/policies", icon: Shield, label: "Policies" },
+  { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

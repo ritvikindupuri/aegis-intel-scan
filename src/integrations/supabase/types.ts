@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          permissions: string[]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name?: string
+          permissions?: string[]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          permissions?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       domain_policies: {
         Row: {
           ai_evaluated: boolean
@@ -165,6 +201,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      scan_schedules: {
+        Row: {
+          created_at: string
+          domain: string
+          enabled: boolean
+          frequency: string
+          id: string
+          last_run_at: string | null
+          last_scan_id: string | null
+          next_run_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          last_scan_id?: string | null
+          next_run_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          last_scan_id?: string | null
+          next_run_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_schedules_last_scan_id_fkey"
+            columns: ["last_scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scans: {
         Row: {
