@@ -136,6 +136,36 @@ export type Database = {
         }
         Relationships: []
       }
+      scan_quotas: {
+        Row: {
+          created_at: string
+          daily_limit: number
+          id: string
+          last_scan_date: string
+          scans_today: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          last_scan_date?: string
+          scans_today?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          last_scan_date?: string
+          scans_today?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       scans: {
         Row: {
           ai_report: string | null

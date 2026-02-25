@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Globe, Loader2, ShieldAlert, ShieldX, ShieldCheck } from "lucide-react";
+import { Search, Globe, Loader2, ShieldAlert, ShieldX, ShieldCheck, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { startScan, evaluateDomain } from "@/lib/api";
+import { startScan, evaluateDomain, getUserQuota } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
@@ -11,8 +11,13 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
   const [domain, setDomain] = useState("");
   const [loading, setLoading] = useState(false);
   const [policyStatus, setPolicyStatus] = useState<{ policy: string; reason: string } | null>(null);
+  const [quota, setQuota] = useState<{ scansToday: number; dailyLimit: number } | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    getUserQuota().then(setQuota);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,9 +54,13 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
       const { scanId } = await startScan(domain.trim());
       toast({ title: "Scan initiated", description: `Crawling ${domain}...` });
       onScanStarted?.();
+      // Refresh quota after scan
+      getUserQuota().then(setQuota);
       navigate(`/scan/${scanId}`);
     } catch (err: any) {
       toast({ title: "Scan failed", description: err.message, variant: "destructive" });
+      // Refresh quota in case it was a rate limit error
+      getUserQuota().then(setQuota);
     } finally {
       setLoading(false);
     }
@@ -75,6 +84,18 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
           {loading ? "Evaluating..." : "Scan"}
         </Button>
       </form>
+
+      {quota && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+          <Gauge className="h-3 w-3" />
+          <span>
+            {quota.scansToday}/{quota.dailyLimit} scans used today
+          </span>
+          {quota.scansToday >= quota.dailyLimit && (
+            <span className="text-destructive font-medium ml-1">— Limit reached</span>
+          )}
+        </div>
+      )}
 
       {policyStatus && (
         <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${

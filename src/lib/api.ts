@@ -43,15 +43,43 @@ export async function startScan(domain: string): Promise<{ scanId: string }> {
   });
 
   if (error) {
+    // Check for rate limiting
+    if (error.message?.includes('Daily scan limit')) {
+      throw new Error(error.message);
+    }
     const recoveredScanId = error.message.match(/"scanId":"([a-f0-9-]+)"/i)?.[1];
     if (recoveredScanId) return { scanId: recoveredScanId };
     throw new Error(error.message);
+  }
+
+  if (data?.rateLimited) {
+    throw new Error(data.error || 'Daily scan limit reached');
   }
 
   // If crawl failed but we have a scanId, return it so user can see the failed state
   if (data?.scanId) return { scanId: data.scanId };
   if (data?.error) throw new Error(data.error);
   return { scanId: data.scanId };
+}
+
+export async function getUserQuota(): Promise<{ scansToday: number; dailyLimit: number } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('scan_quotas')
+    .select('scans_today, daily_limit, last_scan_date')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error || !data) return { scansToday: 0, dailyLimit: 10 };
+
+  const today = new Date().toISOString().split('T')[0];
+  if (data.last_scan_date !== today) {
+    return { scansToday: 0, dailyLimit: data.daily_limit };
+  }
+
+  return { scansToday: data.scans_today, dailyLimit: data.daily_limit };
 }
 
 export async function generateReport(scanId: string): Promise<string> {
