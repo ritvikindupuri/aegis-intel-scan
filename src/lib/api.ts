@@ -83,3 +83,18 @@ export async function getFindings(scanId: string): Promise<Finding[]> {
   if (error) throw error;
   return (data || []) as unknown as Finding[];
 }
+
+export async function deleteScan(id: string): Promise<void> {
+  // Delete findings first (foreign key constraint)
+  const { error: findingsError } = await supabase
+    .from('findings')
+    .delete()
+    .eq('scan_id', id);
+  if (findingsError) throw findingsError;
+
+  const { error } = await supabase
+    .from('scans')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
