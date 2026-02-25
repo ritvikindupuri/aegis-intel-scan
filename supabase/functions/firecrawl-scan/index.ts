@@ -94,7 +94,7 @@ serve(async (req) => {
     // Parse the results
     const rawData = scrapeData.data || scrapeData;
     const html = rawData.html || '';
-    const links = [...new Set([...(rawData.links || []), ...(mapData.links || [])])];
+    const links = [...new Set([...(rawData.links || []), ...(mapData.links || [])])].sort();
     const metadata = rawData.metadata || {};
 
     // Extract technologies from HTML
@@ -146,8 +146,15 @@ serve(async (req) => {
       enrichment,
     }).eq('id', currentScanId);
 
-    // Generate findings
-    const findings = generateFindings(parsedData, technologies, domain);
+    // Generate findings and deduplicate by title+category
+    const rawFindings = generateFindings(parsedData, technologies, domain);
+    const seen = new Set<string>();
+    const findings = rawFindings.filter(f => {
+      const key = `${f.title}::${f.category}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     if (findings.length > 0) {
       const findingsToInsert = findings.map(f => ({ ...f, scan_id: currentScanId }));

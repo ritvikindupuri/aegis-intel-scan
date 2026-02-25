@@ -459,6 +459,50 @@ The `detectTechnologies()` function uses regex pattern matching against the raw 
 | CMS Risk | WordPress detection | Medium |
 | Supply Chain | >10 external dependencies | Low |
 
+#### Scan Consistency Mechanisms
+
+To ensure that repeated scans of the same domain produce consistent, reproducible results — a critical requirement for enterprise audit and compliance workflows — ThreatLens employs three mechanisms:
+
+**1. Deterministic AI Analysis (Temperature = 0)**
+
+All AI model calls across the platform (`analyze-threats`, `analyze-surface`) use `temperature: 0` in their API requests. This forces the model to select the highest-probability token at each step, eliminating the randomness that causes different outputs from the same input. Without this, the same scan data could produce different severity ratings, CVSS estimates, or remediation priorities on each run — unacceptable for compliance reporting.
+
+```json
+{
+  "model": "google/gemini-3-flash-preview",
+  "temperature": 0,
+  "messages": [...]
+}
+```
+
+**2. Finding Deduplication**
+
+The `generateFindings()` function can produce duplicate findings when multiple URLs match the same pattern (e.g., three `/admin`-like paths would previously create three separate "Exposed Admin Panel" findings). A deduplication step now runs before database insertion:
+
+```typescript
+const seen = new Set<string>();
+const findings = rawFindings.filter(f => {
+  const key = `${f.title}::${f.category}`;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
+```
+
+Deduplication uses a composite key of `title + category`. This means two findings with the same title in different categories are preserved (intentional — they represent different security concerns), but identical findings within the same category are collapsed to a single entry. This directly stabilizes the risk score, since fewer duplicate findings means less score inflation.
+
+**3. Crawl Normalization**
+
+URLs discovered from both the Firecrawl scrape and map endpoints are sorted alphabetically after deduplication:
+
+```typescript
+const links = [...new Set([...scrapeLinks, ...mapLinks])].sort();
+```
+
+This ensures that even if Firecrawl returns URLs in a different order between runs (due to internal concurrency, CDN routing, or server-side randomization), the downstream slicing (`urls.slice(0, 500)`, `endpoints.slice(0, 100)`, etc.) always selects the same subset of URLs. Without sorting, two scans of the same domain could process different URL subsets, leading to different findings simply because the array order changed.
+
+**Combined Effect**: These three mechanisms work together to minimize variance between scans of the same domain. The remaining sources of variance (dynamic site content, A/B testing, CDN geo-routing, bot detection) are inherent to web scraping and cannot be eliminated from the client side.
+
 Once the scan pipeline completes and findings are stored, users can request deeper analysis. The next two edge functions handle that — generating comprehensive AI reports and powering the interactive chatbot.
 
 ### 4.2 AI Threat Report Generator
