@@ -479,6 +479,22 @@ const Compare = () => {
                   </p>
                 </CardHeader>
                 <CardContent>
+                  {/* Scan reference labels */}
+                  <div className="flex flex-wrap items-center gap-4 mb-4 text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2 w-2 rounded-full bg-primary" />
+                      <span className="uppercase tracking-wider font-semibold">Baseline (A):</span>
+                      <span className="font-mono text-foreground">{dataA.scan.domain}</span>
+                      <span className="text-muted-foreground/70">({format(new Date(dataA.scan.created_at), "MMM d, yyyy")})</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2 w-2 rounded-full bg-accent" />
+                      <span className="uppercase tracking-wider font-semibold">Current (B):</span>
+                      <span className="font-mono text-foreground">{dataB.scan.domain}</span>
+                      <span className="text-muted-foreground/70">({format(new Date(dataB.scan.created_at), "MMM d, yyyy")})</span>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                      {/* Newly Detected */}
                     <div className="space-y-2">
@@ -491,7 +507,7 @@ const Compare = () => {
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground/70 -mt-1">
-                        Found in the current scan but absent from the baseline — new attack vectors or previously hidden surfaces.
+                        In <span className="font-mono font-semibold text-foreground">{dataB.scan.domain}</span> (B) but not in baseline — new attack vectors or previously hidden surfaces.
                       </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.newVulns.length === 0 ? (
@@ -519,7 +535,7 @@ const Compare = () => {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground/70 -mt-1">
-                        Present in baseline but not in latest scan. May indicate patching, reconfiguration, or access restriction — <span className="font-semibold text-muted-foreground">not confirmed remediation</span>.
+                        In <span className="font-mono font-semibold text-foreground">{dataA.scan.domain}</span> (A) but not in current scan — may indicate patching or access restriction, <span className="font-semibold text-muted-foreground">not confirmed remediation</span>.
                       </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.resolved.length === 0 ? (
