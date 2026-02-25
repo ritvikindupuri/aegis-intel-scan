@@ -102,10 +102,13 @@ const Auth = () => {
         if (error) throw error;
         if (data?.url) {
           const oauthUrl = new URL(data.url);
-          const allowedHosts = ["accounts.google.com"];
-          if (!allowedHosts.some((host) => oauthUrl.hostname === host)) {
+          const authHost = new URL(import.meta.env.VITE_SUPABASE_URL).hostname;
+          const allowedHosts = new Set([authHost, "accounts.google.com"]);
+
+          if (!["http:", "https:"].includes(oauthUrl.protocol) || !allowedHosts.has(oauthUrl.hostname)) {
             throw new Error("Invalid OAuth redirect URL");
           }
+
           window.location.href = data.url;
           return;
         }
