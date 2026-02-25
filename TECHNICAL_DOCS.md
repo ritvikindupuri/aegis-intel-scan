@@ -867,9 +867,14 @@ For organizations scanning the same domain periodically, the Compare page enable
 - Uses `google/gemini-3-flash-preview` via the Lovable AI Gateway
 
 <p align="center">
-  <img src="https://i.imgur.com/iW4XrM2.png" alt="Scan Comparison Page" width="900" />
+  <img src="https://i.imgur.com/jwj3GTB.png" alt="Scan Comparison — Executive Summary & Risk Score" width="900" />
 </p>
-<p align="center"><em>Figure 6 — Scan Comparison — Side-by-side delta analysis with risk score explanation, finding delta (Newly Detected / No Longer Detected / Still Present), technology & endpoint changes, and AI analyst chatbot</em></p>
+<p align="center"><em>Figure 6 — Scan Comparison — Executive summary, risk score change with scoring formula explainer, and per-severity breakdown</em></p>
+
+<p align="center">
+  <img src="https://i.imgur.com/5ZJoqK6.png" alt="Scan Comparison — Finding Delta & AI Analyst" width="900" />
+</p>
+<p align="center"><em>Figure 7 — Scan Comparison — Technology & endpoint changes, and AI Threat Analyst chatbot with MITRE ATT&CK / CWE references</em></p>
 
 
 #### `Policies.tsx` — Domain Policy Management
@@ -888,7 +893,7 @@ This page is the human override layer on top of the AI policy agent — allowing
 <p align="center">
   <img src="https://i.imgur.com/gyo02jq.png" alt="Domain Policies Page" width="900" />
 </p>
-<p align="center"><em>Figure 7 — Domain Policies — Stats cards, manual policy form, policy list with AI-evaluated indicators, and immutable audit log</em></p>
+<p align="center"><em>Figure 8 — Domain Policies — Stats cards, manual policy form, policy list with AI-evaluated indicators, and immutable audit log</em></p>
 
 #### `NotFound.tsx` — 404 Page
 - Centered layout with "404" heading, "Page not found" message, and link back to home
