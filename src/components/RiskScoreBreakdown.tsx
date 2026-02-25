@@ -87,7 +87,7 @@ export function RiskScoreBreakdown({ score, findings }: RiskScoreBreakdownProps)
                       style={{ height: c.rawPoints > 0 ? `${heightPct}%` : '4px' }}
                     />
                     <span className={`text-[9px] font-medium ${c.rawPoints > 0 ? c.color : 'text-muted-foreground/50'}`}>
-                      {c.label.slice(0, 4)}
+                      {c.label}
                     </span>
                   </div>
                 );
