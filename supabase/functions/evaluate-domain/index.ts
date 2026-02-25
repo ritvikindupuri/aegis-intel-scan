@@ -88,7 +88,10 @@ serve(async (req) => {
 });
 
 async function evaluateWithAI(domain: string): Promise<{ policy: string; reason: string }> {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) {
+    return { policy: 'review', reason: 'AI evaluation is not configured (missing API key). This domain has been flagged for manual review — you can approve it on the Policies page to proceed with scanning.' };
+  }
 
   const prompt = `You are a security policy AI agent for a threat intelligence platform called ThreatLens. Your job is to evaluate whether a domain should be allowed for security scanning.
 
@@ -103,11 +106,11 @@ Respond with ONLY valid JSON (no markdown):
 {"policy": "allow" | "block" | "review", "reason": "one sentence explanation"}`;
 
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/ai-proxy`, {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash-lite',
@@ -117,7 +120,7 @@ Respond with ONLY valid JSON (no markdown):
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI proxy error:', errorText);
+      console.error('AI gateway error:', response.status, errorText);
       const statusHint = response.status === 429 
         ? 'The AI evaluation service is temporarily rate-limited.' 
         : response.status === 402 
