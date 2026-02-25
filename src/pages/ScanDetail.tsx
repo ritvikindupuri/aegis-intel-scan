@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getScan, getFindings, generateReport, type Scan, type Finding } from "@/lib/api";
 import { SeverityBadge, RiskScoreGauge, StatusBadge } from "@/components/SeverityBadge";
+import { RiskScoreBreakdown } from "@/components/RiskScoreBreakdown";
 import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -144,6 +145,9 @@ const ScanDetail = () => {
               </Card>
             ))}
           </div>
+
+          {/* Risk Score Breakdown */}
+          <RiskScoreBreakdown score={scan.risk_score} findings={findings} />
 
           {/* Enrichment */}
           {enrichment.whois && (

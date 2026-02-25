@@ -16,10 +16,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="border-b border-border glass sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14 px-4">
           <Link to="/" className="flex items-center gap-2.5">
-            <img src={spectraLogo} alt="Spectra" className="h-7 w-7 rounded-md" />
+            <img src={spectraLogo} alt="ThreatLens" className="h-7 w-7 rounded-md" />
             <span className="text-lg font-bold tracking-tight">
-              <span className="text-gradient-primary">Spec</span>
-              <span className="text-foreground">tra</span>
+              <span className="text-gradient-primary">Threat</span>
+              <span className="text-foreground">Lens</span>
             </span>
           </Link>
           <nav className="flex items-center gap-0.5">

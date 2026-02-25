@@ -53,10 +53,10 @@ const Dashboard = () => {
     <div className="space-y-8">
       {/* Hero */}
       <div className="flex flex-col items-center text-center gap-5 py-10">
-        <img src={spectraLogo} alt="Spectra" className="h-14 w-14 rounded-xl" />
+        <img src={spectraLogo} alt="ThreatLens" className="h-14 w-14 rounded-xl" />
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-gradient-primary">Spec</span>tra
+            <span className="text-gradient-primary">Threat</span>Lens
           </h1>
           <p className="text-muted-foreground mt-2 max-w-lg text-sm leading-relaxed">
             Automated threat intelligence & attack surface mapping. Enter a domain to begin reconnaissance.
@@ -88,7 +88,6 @@ const Dashboard = () => {
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
-        {/* Recent Scans */}
         <Card className="md:col-span-2 bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
@@ -134,7 +133,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Sidebar */}
         <div className="space-y-4">
           <Card className="bg-card border-border">
             <CardHeader className="pb-3">
