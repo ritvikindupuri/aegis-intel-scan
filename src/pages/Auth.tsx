@@ -194,11 +194,7 @@ const Auth = () => {
 
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground pt-1">
               <Shield className="h-3 w-3 shrink-0" />
-              <span>
-                {mode === "signin"
-                  ? "Only registered accounts can sign in"
-                  : "Your account will be protected by AI-powered domain policies"}
-              </span>
+              <span>Your account will be protected by AI-powered domain policies</span>
             </div>
           </CardContent>
         </Card>
