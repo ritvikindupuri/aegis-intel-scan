@@ -38,7 +38,7 @@ const Auth = () => {
   }, []);
 
   const handlePostAuth = async (session: any) => {
-    // Check if user has a profile (i.e., has signed up)
+    // Check if user has a profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('id')
@@ -46,45 +46,38 @@ const Auth = () => {
       .maybeSingle();
 
     if (profile) {
-      // Existing user — let them in
       navigate("/", { replace: true });
     } else {
-      // Check localStorage for signup intent
-      const intent = localStorage.getItem('auth_intent');
+      // Auto-create profile for any authenticated user
+      const { error } = await supabase.from('profiles').insert({
+        user_id: session.user.id,
+        email: session.user.email,
+        display_name: session.user.user_metadata?.full_name || session.user.email,
+        avatar_url: session.user.user_metadata?.avatar_url || null,
+      });
 
-      if (intent === 'signup') {
-        // Create profile for new user
-        const { error } = await supabase.from('profiles').insert({
-          user_id: session.user.id,
-          email: session.user.email,
-          display_name: session.user.user_metadata?.full_name || session.user.email,
-          avatar_url: session.user.user_metadata?.avatar_url || null,
-        });
-        localStorage.removeItem('auth_intent');
-
-        if (error) {
+      if (error) {
+        // Profile might already exist (race condition) — try navigating anyway
+        const { data: retryProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        if (retryProfile) {
+          navigate("/", { replace: true });
+        } else {
           toast({ title: "Registration failed", description: error.message, variant: "destructive" });
           await supabase.auth.signOut();
-        } else {
-          toast({ title: "Account created", description: "Welcome to ThreatLens!" });
-          navigate("/", { replace: true });
         }
       } else {
-        // Tried to sign in without an account
-        toast({
-          title: "No account found",
-          description: "You need to sign up first before signing in.",
-          variant: "destructive",
-        });
-        await supabase.auth.signOut();
-        localStorage.removeItem('auth_intent');
+        toast({ title: "Welcome to ThreatLens!", description: "Your account has been created." });
+        navigate("/", { replace: true });
       }
     }
   };
 
   const handleGoogle = async (authMode: AuthMode) => {
     setLoading(true);
-    localStorage.setItem('auth_intent', authMode);
     try {
       const { error } = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: `${window.location.origin}/auth`,
@@ -92,12 +85,10 @@ const Auth = () => {
       if (error) {
         toast({ title: "Authentication failed", description: error.message, variant: "destructive" });
         setLoading(false);
-        localStorage.removeItem('auth_intent');
       }
     } catch (err: any) {
       toast({ title: "Authentication failed", description: err.message, variant: "destructive" });
       setLoading(false);
-      localStorage.removeItem('auth_intent');
     }
   };
 
