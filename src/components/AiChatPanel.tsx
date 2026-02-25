@@ -10,7 +10,7 @@ interface Message {
 }
 
 interface AiChatPanelProps {
-  context: "surface" | "findings" | "raw_data";
+  context: "surface" | "findings" | "raw_data" | "compare";
   contextData: any;
   domain: string;
   onInsight?: (section: string, analysis: string) => void;
@@ -20,6 +20,7 @@ const CONTEXT_LABELS: Record<string, string> = {
   surface: "Attack Surface",
   findings: "Findings",
   raw_data: "Raw Data",
+  compare: "Scan Comparison",
 };
 
 const SUGGESTED_QUESTIONS: Record<string, string[]> = {
@@ -40,6 +41,12 @@ const SUGGESTED_QUESTIONS: Record<string, string[]> = {
     "What sensitive information is exposed in the raw data?",
     "Identify infrastructure details from this data",
     "What can an attacker learn from this raw data?",
+  ],
+  compare: [
+    "Explain the risk score change in plain language",
+    "What are the most concerning newly detected findings?",
+    "Has the attack surface expanded or contracted?",
+    "What infrastructure changes should the analyst investigate?",
   ],
 };
 
@@ -221,7 +228,7 @@ export function AiChatPanel({ context, contextData, domain, onInsight }: AiChatP
     setLoading(true);
 
     try {
-      const section = context === "surface" ? "surface_chat" : context === "findings" ? "findings_chat" : "raw_data_chat";
+      const section = context === "surface" ? "surface_chat" : context === "findings" ? "findings_chat" : context === "compare" ? "compare_chat" : "raw_data_chat";
       const result = await analyzeSurface(section, { question, data: contextData }, domain);
       const assistantMsg: Message = { role: "assistant", content: result };
       setMessages(prev => [...prev, assistantMsg]);

@@ -7,8 +7,9 @@ import {
   GitCompareArrows, Globe, Plus, Minus, ArrowRight, ArrowUp, ArrowDown,
   AlertTriangle, Cpu, Link2, Loader2, Shield, ShieldAlert, ShieldCheck,
   TrendingUp, TrendingDown, Equal, Calendar, Hash, Bug, CheckCircle2,
-  Info, ExternalLink
+  Info, ExternalLink, EyeOff, Eye
 } from "lucide-react";
+import { AiChatPanel } from "@/components/AiChatPanel";
 import { format, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { fadeInUp, staggerContainer } from "@/components/PageTransition";
@@ -331,38 +332,94 @@ const Compare = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center gap-6">
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-1">Scan A</div>
-                    <div className={`text-3xl font-mono font-bold ${
-                      (dataA.scan.risk_score ?? 0) >= 75 ? "text-severity-critical" :
-                      (dataA.scan.risk_score ?? 0) >= 50 ? "text-severity-high" :
-                      (dataA.scan.risk_score ?? 0) >= 25 ? "text-severity-medium" : "text-severity-low"
-                    }`}>{dataA.scan.risk_score}</div>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-1">Scan B</div>
-                    <div className={`text-3xl font-mono font-bold ${
-                      (dataB.scan.risk_score ?? 0) >= 75 ? "text-severity-critical" :
-                      (dataB.scan.risk_score ?? 0) >= 50 ? "text-severity-high" :
-                      (dataB.scan.risk_score ?? 0) >= 25 ? "text-severity-medium" : "text-severity-low"
-                    }`}>{dataB.scan.risk_score}</div>
-                  </div>
-                  <div className="ml-4 text-center">
-                    <div className="text-xs text-muted-foreground mb-1">Delta</div>
-                    {(() => {
-                      const delta = (dataB.scan.risk_score ?? 0) - (dataA.scan.risk_score ?? 0);
-                      return (
-                        <div className={`text-2xl font-mono font-bold ${
-                          delta > 0 ? "text-severity-critical" : delta < 0 ? "text-success" : "text-muted-foreground"
-                        }`}>
-                          {delta > 0 ? `+${delta}` : delta}
+                {(() => {
+                  const scoreA = dataA.scan.risk_score ?? 0;
+                  const scoreB = dataB.scan.risk_score ?? 0;
+                  const delta = scoreB - scoreA;
+                  const getRiskLabel = (s: number) => s >= 75 ? "Critical" : s >= 50 ? "High" : s >= 25 ? "Medium" : "Low";
+                  const getRiskColor = (s: number) => s >= 75 ? "text-severity-critical" : s >= 50 ? "text-severity-high" : s >= 25 ? "text-severity-medium" : "text-severity-low";
+                  const getRiskBg = (s: number) => s >= 75 ? "bg-severity-critical/10 border-severity-critical/20" : s >= 50 ? "bg-severity-high/10 border-severity-high/20" : s >= 25 ? "bg-severity-medium/10 border-severity-medium/20" : "bg-severity-low/10 border-severity-low/20";
+
+                  // Build explanation of what changed
+                  const drivers: string[] = [];
+                  if (severityA && severityB) {
+                    const critDelta = severityB.critical - severityA.critical;
+                    const highDelta = severityB.high - severityA.high;
+                    const medDelta = severityB.medium - severityA.medium;
+                    if (critDelta > 0) drivers.push(`${critDelta} new critical finding${critDelta > 1 ? 's' : ''} detected`);
+                    if (critDelta < 0) drivers.push(`${Math.abs(critDelta)} critical finding${Math.abs(critDelta) > 1 ? 's' : ''} no longer detected`);
+                    if (highDelta > 0) drivers.push(`${highDelta} new high finding${highDelta > 1 ? 's' : ''} detected`);
+                    if (highDelta < 0) drivers.push(`${Math.abs(highDelta)} high finding${Math.abs(highDelta) > 1 ? 's' : ''} no longer detected`);
+                    if (medDelta > 0) drivers.push(`${medDelta} new medium finding${medDelta > 1 ? 's' : ''} detected`);
+                    if (medDelta < 0) drivers.push(`${Math.abs(medDelta)} medium finding${Math.abs(medDelta) > 1 ? 's' : ''} no longer detected`);
+                  }
+                  if (findingDiff) {
+                    if (findingDiff.newVulns.length > 0 && drivers.length === 0) drivers.push(`${findingDiff.newVulns.length} new finding(s) appeared`);
+                    if (findingDiff.resolved.length > 0 && drivers.length === 0) drivers.push(`${findingDiff.resolved.length} finding(s) no longer detected`);
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Visual score comparison */}
+                      <div className="flex items-center justify-center gap-4 md:gap-8">
+                        <div className={`text-center p-4 rounded-lg border ${getRiskBg(scoreA)} min-w-[120px]`}>
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Baseline (A)</div>
+                          <div className={`text-4xl font-mono font-bold ${getRiskColor(scoreA)}`}>{scoreA}</div>
+                          <div className={`text-xs font-semibold mt-1 ${getRiskColor(scoreA)}`}>{getRiskLabel(scoreA)} Risk</div>
                         </div>
-                      );
-                    })()}
-                  </div>
-                </div>
+
+                        <div className="flex flex-col items-center gap-1">
+                          <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                          <div className={`text-2xl font-mono font-bold px-3 py-1 rounded-md ${
+                            delta > 0 ? "text-severity-critical bg-severity-critical/10" : 
+                            delta < 0 ? "text-success bg-success/10" : "text-muted-foreground bg-secondary"
+                          }`}>
+                            {delta > 0 ? `+${delta}` : delta === 0 ? "±0" : delta}
+                          </div>
+                          <div className={`text-[10px] font-medium ${
+                            delta > 0 ? "text-severity-critical" : delta < 0 ? "text-success" : "text-muted-foreground"
+                          }`}>
+                            {delta > 0 ? "RISK INCREASED" : delta < 0 ? "RISK DECREASED" : "NO CHANGE"}
+                          </div>
+                        </div>
+
+                        <div className={`text-center p-4 rounded-lg border ${getRiskBg(scoreB)} min-w-[120px]`}>
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Current (B)</div>
+                          <div className={`text-4xl font-mono font-bold ${getRiskColor(scoreB)}`}>{scoreB}</div>
+                          <div className={`text-xs font-semibold mt-1 ${getRiskColor(scoreB)}`}>{getRiskLabel(scoreB)} Risk</div>
+                        </div>
+                      </div>
+
+                      {/* What drove the change */}
+                      {drivers.length > 0 && (
+                        <div className="bg-secondary/50 rounded-lg p-3 border border-border/50">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-semibold">What drove this change</p>
+                          <ul className="space-y-1">
+                            {drivers.map((d, i) => (
+                              <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                                <span className="text-primary mt-0.5">•</span>
+                                <span>{d}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Risk score interpretation */}
+                      <div className="bg-secondary/30 rounded-lg p-3 border border-border/30">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 font-semibold">How to read this</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Risk scores are computed from weighted findings: <span className="font-mono text-foreground">Critical×25 + High×15 + Medium×8 + Low×3 + Info×1</span>, capped at 100. 
+                          {delta > 0 
+                            ? " The increase suggests new weaknesses were discovered in the target's attack surface since the baseline scan."
+                            : delta < 0 
+                            ? " The decrease indicates some previously detected weaknesses are no longer visible — this could mean the target patched, reconfigured, or the findings are now behind authentication."
+                            : " No change means the target's observable attack surface remained stable between scans."}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Severity breakdown comparison */}
                 {severityA && severityB && (
@@ -414,25 +471,28 @@ const Compare = () => {
             <motion.div variants={fadeInUp}>
               <Card className="bg-card border-border">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <ShieldAlert className="h-3.5 w-3.5 text-severity-high" /> Vulnerability Delta
+                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <ShieldAlert className="h-3.5 w-3.5 text-severity-high" /> Finding Delta
                   </CardTitle>
                   <p className="text-[10px] text-muted-foreground/70">
-                    Findings are matched by title. "New" = present in B but not A. "Resolved" = present in A but not B. "Persistent" = present in both.
+                    Findings matched by title across scans. "Newly Detected" = in current scan only. "No Longer Detected" = in baseline only (not confirmed fixed). "Still Present" = in both.
                   </p>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* New Vulnerabilities */}
+                     {/* Newly Detected */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs uppercase tracking-wider text-severity-critical flex items-center gap-1.5 font-semibold">
-                          <Plus className="h-3 w-3" /> New ({findingDiff.newVulns.length})
+                          <Plus className="h-3 w-3" /> Newly Detected ({findingDiff.newVulns.length})
                         </span>
                         {findingDiff.newVulns.length > 0 && (
-                          <span className="text-[10px] text-severity-critical/70 bg-severity-critical/10 px-1.5 py-0.5 rounded">Action Required</span>
+                          <span className="text-[10px] text-severity-critical/70 bg-severity-critical/10 px-1.5 py-0.5 rounded">Investigate</span>
                         )}
                       </div>
+                      <p className="text-[10px] text-muted-foreground/70 -mt-1">
+                        Found in the current scan but absent from the baseline — new attack vectors or previously hidden surfaces.
+                      </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.newVulns.length === 0 ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground py-4 justify-center">
@@ -451,26 +511,27 @@ const Compare = () => {
                       </div>
                     </div>
 
-                    {/* Resolved */}
+                    {/* No Longer Detected */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs uppercase tracking-wider text-success flex items-center gap-1.5 font-semibold">
-                          <CheckCircle2 className="h-3 w-3" /> Resolved ({findingDiff.resolved.length})
+                          <EyeOff className="h-3 w-3" /> No Longer Detected ({findingDiff.resolved.length})
                         </span>
-                        {findingDiff.resolved.length > 0 && (
-                          <span className="text-[10px] text-success/70 bg-success/10 px-1.5 py-0.5 rounded">Improvement</span>
-                        )}
                       </div>
+                      <p className="text-[10px] text-muted-foreground/70 -mt-1">
+                        Present in baseline but not in latest scan. May indicate patching, reconfiguration, or access restriction — <span className="font-semibold text-muted-foreground">not confirmed remediation</span>.
+                      </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.resolved.length === 0 ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground py-4 justify-center">
-                            No resolved vulnerabilities
+                            <ShieldCheck className="h-4 w-4 text-success" />
+                            All baseline findings still detected
                           </div>
                         ) : findingDiff.resolved.map((f, i) => (
                           <div key={i} className="flex items-start gap-2 p-2 rounded-md bg-success/5 border border-success/10">
                             <SeverityBadge severity={f.severity} />
                             <div className="min-w-0">
-                              <span className="text-xs text-muted-foreground block truncate line-through">{f.title}</span>
+                              <span className="text-xs text-muted-foreground block truncate">{f.title}</span>
                               <span className="text-[10px] text-muted-foreground">{f.category}</span>
                             </div>
                           </div>
@@ -478,20 +539,20 @@ const Compare = () => {
                       </div>
                     </div>
 
-                    {/* Persistent */}
+                    {/* Still Present */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-semibold">
-                          <AlertTriangle className="h-3 w-3" /> Persistent ({findingDiff.persistent.length})
+                          <Eye className="h-3 w-3" /> Still Present ({findingDiff.persistent.length})
                         </span>
-                        {findingDiff.persistent.length > 0 && (
-                          <span className="text-[10px] text-muted-foreground/70 bg-secondary px-1.5 py-0.5 rounded">Unresolved</span>
-                        )}
                       </div>
+                      <p className="text-[10px] text-muted-foreground/70 -mt-1">
+                        Detected in both scans — the target's attack surface still exposes these weaknesses.
+                      </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.persistent.length === 0 ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground py-4 justify-center">
-                            No persistent vulnerabilities
+                            No overlapping findings
                           </div>
                         ) : findingDiff.persistent.map((f, i) => (
                           <div key={i} className="flex items-start gap-2 p-2 rounded-md bg-secondary/50 border border-border/50">
@@ -622,7 +683,28 @@ const Compare = () => {
             </motion.div>
           )}
 
-          {/* Unchanged endpoints summary */}
+          {/* AI Analyst for Compare */}
+          <motion.div variants={fadeInUp}>
+            <AiChatPanel
+              context="compare"
+              contextData={{
+                scanA: { domain: dataA.scan.domain, risk_score: dataA.scan.risk_score, created_at: dataA.scan.created_at, findings_count: dataA.findings.length, endpoints_count: dataA.urls.length, technologies: dataA.technologies },
+                scanB: { domain: dataB.scan.domain, risk_score: dataB.scan.risk_score, created_at: dataB.scan.created_at, findings_count: dataB.findings.length, endpoints_count: dataB.urls.length, technologies: dataB.technologies },
+                delta: {
+                  risk_score_change: (dataB.scan.risk_score ?? 0) - (dataA.scan.risk_score ?? 0),
+                  new_findings: findingDiff?.newVulns.map(f => ({ title: f.title, severity: f.severity, category: f.category })) ?? [],
+                  no_longer_detected: findingDiff?.resolved.map(f => ({ title: f.title, severity: f.severity, category: f.category })) ?? [],
+                  still_present: findingDiff?.persistent.map(f => ({ title: f.title, severity: f.severity, category: f.category })) ?? [],
+                  tech_added: techDiff?.added ?? [],
+                  tech_removed: techDiff?.removed ?? [],
+                  endpoints_added: urlDiff?.added.length ?? 0,
+                  endpoints_removed: urlDiff?.removed.length ?? 0,
+                },
+              }}
+              domain={dataA.scan.domain}
+            />
+          </motion.div>
+
           {urlDiff && urlDiff.unchanged.length > 0 && (
             <motion.div variants={fadeInUp}>
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-2">

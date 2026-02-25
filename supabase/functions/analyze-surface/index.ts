@@ -145,6 +145,22 @@ Here is the raw crawl data (truncated):
 ${contextStr}
 
 Answer the analyst's question directly using the raw data. Interpret and contextualize — don't repeat data verbatim. Be technical and actionable. Use markdown.`;
+    } else if (section === 'compare_chat') {
+      const question = data.question;
+      const contextStr = JSON.stringify(data.data, null, 2).slice(0, 12000);
+      prompt = `You are a Principal Threat Intelligence Analyst specializing in attack surface monitoring. The analyst is comparing two scans of "${domain}" and asks:
+
+"${question}"
+
+Here is the comparison delta data (includes risk scores, newly detected findings, findings no longer detected, still-present findings, technology changes, and endpoint changes):
+${contextStr}
+
+IMPORTANT CONTEXT:
+- This is a PASSIVE RECONNAISSANCE tool. "No longer detected" does NOT mean "remediated" — it means the scanner could not observe the finding in the latest scan. The target may have patched, reconfigured, added authentication, or the finding may simply be intermittent.
+- Risk scores are computed as: Critical×25 + High×15 + Medium×8 + Low×3 + Info×1, capped at 100.
+- New findings represent newly observable attack surface — they may have existed before but were not detected.
+
+Answer the analyst's question directly. Be precise about what the data shows vs. what it implies. Avoid making definitive claims about remediation. Use markdown formatting. Reference OWASP/CWE/MITRE ATT&CK where relevant.`;
     } else {
       return new Response(JSON.stringify({ error: 'Invalid section' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
