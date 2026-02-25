@@ -268,6 +268,7 @@ export function exportReportAsPdf(scan: Scan, findings: Finding[], surfaceInsigh
       security_headers: "Security Headers Analysis",
       endpoints: "Discovered Endpoints Analysis",
       dependencies: "External Dependencies Analysis",
+      raw_data: "Raw Data Intelligence Briefing",
     };
 
     for (const [section, content] of Object.entries(surfaceInsights)) {

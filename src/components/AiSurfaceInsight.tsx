@@ -5,7 +5,7 @@ import { analyzeSurface } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface AiSurfaceInsightProps {
-  section: "security_headers" | "endpoints" | "dependencies";
+  section: "security_headers" | "endpoints" | "dependencies" | "raw_data";
   data: any;
   domain: string;
   onAnalysis?: (section: string, analysis: string) => void;
@@ -29,7 +29,7 @@ export function AiSurfaceInsight({ section, data, domain, onAnalysis }: AiSurfac
     }
   };
 
-  const sectionLabel = section === "security_headers" ? "Security Headers" : section === "endpoints" ? "Endpoints" : "Dependencies";
+  const sectionLabel = section === "security_headers" ? "Security Headers" : section === "endpoints" ? "Endpoints" : section === "raw_data" ? "Raw Data" : "Dependencies";
 
   if (analysis) {
     return (

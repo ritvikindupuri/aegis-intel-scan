@@ -74,6 +74,44 @@ Provide:
 6. **Hardening Recommendations** — Top 3-5 steps to reduce supply chain risk (SRI, CSP, self-hosting critical libs, etc.)
 
 Keep it technical and concise. Use markdown formatting.`;
+    } else if (section === 'raw_data') {
+      const rawStr = JSON.stringify(data, null, 2).slice(0, 12000);
+      prompt = `You are a Principal Threat Intelligence Analyst reviewing raw crawl data for "${domain}". The raw data below was collected by an automated web crawler. Your job is to translate this into a clear, analyst-friendly briefing.
+
+Raw Crawl Data (truncated):
+${rawStr}
+
+Produce a structured intelligence briefing with the following sections:
+
+## Executive Summary
+2-3 sentences summarizing what was found and the overall risk posture.
+
+## Infrastructure Overview
+- Hosting details, IP ranges, server software, CDN usage
+- DNS configuration observations
+- TLS/SSL configuration details if present
+
+## Application Fingerprint
+- Detected frameworks, CMS, languages, and libraries with versions
+- Server-side vs client-side technology stack
+- Authentication mechanisms observed
+
+## Content & Data Exposure
+- Types of content discovered (pages, APIs, documents, media)
+- Any sensitive data patterns (emails, internal paths, API keys, tokens, debug info)
+- Error pages or stack traces that reveal internal details
+
+## Notable Observations
+- Anything unusual, misconfigured, or high-risk spotted in the raw data
+- Patterns that suggest development/staging environments
+- Evidence of security controls (WAF, rate limiting, bot detection)
+
+## Key Takeaways for the Analyst
+- Top 3-5 most important findings from this data
+- What to investigate further
+- Priority actions
+
+Keep it clear, professional, and actionable. Use markdown formatting. Avoid repeating raw data verbatim — interpret and contextualize it.`;
     } else {
       return new Response(JSON.stringify({ error: 'Invalid section' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
