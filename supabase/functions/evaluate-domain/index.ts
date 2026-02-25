@@ -23,14 +23,28 @@ serve(async (req) => {
       });
     }
 
+    // Extract user ID from auth header
+    const authHeader = req.headers.get('authorization');
+    let userId: string | null = null;
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      userId = user?.id || null;
+    }
+
     const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 
-    // 1. Check existing policy
-    const { data: existingPolicy } = await supabase
+    // 1. Check existing policy (scoped to user if available)
+    let existingPolicyQuery = supabase
       .from('domain_policies')
       .select('*')
-      .eq('domain', cleanDomain)
-      .maybeSingle();
+      .eq('domain', cleanDomain);
+    if (userId) existingPolicyQuery = existingPolicyQuery.eq('user_id', userId);
+    const { data: existingPolicy } = await existingPolicyQuery.maybeSingle();
 
     if (existingPolicy) {
       // Log the action
@@ -38,6 +52,7 @@ serve(async (req) => {
         domain: cleanDomain,
         action: existingPolicy.policy_type === 'allow' ? 'approved' : existingPolicy.policy_type === 'block' ? 'blocked' : 'flagged',
         reason: `Existing policy: ${existingPolicy.reason || existingPolicy.policy_type}`,
+        user_id: userId,
       });
 
       return new Response(JSON.stringify({
@@ -59,6 +74,7 @@ serve(async (req) => {
       policy_type: aiDecision.policy,
       reason: aiDecision.reason,
       ai_evaluated: true,
+      user_id: userId,
     });
 
     // 4. Log the action
@@ -66,6 +82,7 @@ serve(async (req) => {
       domain: cleanDomain,
       action: aiDecision.policy === 'allow' ? 'approved' : aiDecision.policy === 'block' ? 'blocked' : 'flagged',
       reason: `AI evaluation: ${aiDecision.reason}`,
+      user_id: userId,
     });
 
     return new Response(JSON.stringify({
