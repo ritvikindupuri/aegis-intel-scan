@@ -72,7 +72,7 @@ The architecture of ThreatLens follows a three-tier model: a React single-page a
 
 ```mermaid
 flowchart TD
-    A["User enters domain"] --> B["evaluate-domain\nAI Policy Check\n(Gemini Flash Lite)"]
+    A["User enters domain"] --> B["evaluate-domain\nAI Policy Check\n(Gemini 3 Flash Preview)"]
     B --> C{"Allowed?"}
     C -- "NO" --> D["Block / Review\nShow reason to user"]
     C -- "YES" --> E["firecrawl-scan\nOrchestration Edge Function"]
@@ -110,8 +110,8 @@ flowchart TD
     J --> K["Store in PostgreSQL\nscans + findings tables"]
     K --> L["Display in Scan Detail UI\nauto-polls every 3s"]
     
-    L --> M["analyze-threats\nAI Report (Gemini Pro)"]
-    L --> N["analyze-surface\nAI Chat (Gemini Flash)"]
+    L --> M["analyze-threats\nAI Report\n(Gemini 3 Flash Preview)"]
+    L --> N["analyze-surface\nAI Chat\n(Gemini 3 Flash Preview)"]
     L --> O["PDF Export\n(jsPDF)"]
 ```
 
@@ -514,7 +514,7 @@ Generates comprehensive enterprise-grade AI threat intelligence reports. While t
 
 **Input**: `{ scanId }` → Fetches scan + findings from database using service role key
 
-**AI Model**: `google/gemini-2.5-pro` via Lovable AI Gateway (`https://ai.gateway.lovable.dev`)
+**AI Model**: `google/gemini-3-flash-preview` via Lovable AI Gateway (`https://ai.gateway.lovable.dev`)
 
 **AI Prompt Structure**:
 - System role: Principal Cybersecurity Analyst at a Fortune 500 firm
@@ -554,7 +554,7 @@ Powers both the interactive AI chatbot (`AiChatPanel`) and the one-click AI anal
 | `findings_chat` | `AiChatPanel` (findings tab) | All findings + question | Severity prioritization, remediation guidance |
 | `raw_data_chat` | `AiChatPanel` (raw data tab) | Raw crawl data + question | Data interpretation and contextualization |
 
-**AI Model**: `google/gemini-2.5-flash` via Lovable AI Gateway
+**AI Model**: `google/gemini-3-flash-preview` via Lovable AI Gateway
 
 **System prompt**: Principal Cybersecurity Analyst specializing in web app security, pen testing, and threat intelligence. References OWASP, CWE, MITRE ATT&CK.
 
@@ -572,7 +572,7 @@ flowchart TD
     A --> B["Check domain_policies table\nfor existing policy"]
     B --> C{"Policy\nexists?"}
     C -- "YES" --> D["Return stored policy\n+ log to audit_log"]
-    C -- "NO" --> E["AI Evaluation\nGemini 2.5 Flash Lite\nvia Lovable AI Gateway"]
+    C -- "NO" --> E["AI Evaluation\nGemini 3 Flash Preview\nvia Lovable AI Gateway"]
     
     E --> F{"AI response\nparseable?"}
     F -- "YES" --> G{"Policy\ntype?"}
@@ -598,7 +598,7 @@ flowchart TD
 1. **Domain Cleaning** — The input domain is normalized: converted to lowercase, and any protocol prefix (`https://`, `http://`) or trailing path (`/page/about`) is stripped, leaving only the bare hostname (e.g., `example.com`).
 2. **Cache Check** — The function queries the `domain_policies` table for an existing policy matching the cleaned domain.
 3. **Cache Hit Path** — If a policy already exists (either from a previous AI evaluation or a manual override), it is returned immediately without making any AI call. An audit log entry is written to `scan_audit_log` with the prefix `"Existing policy:"` followed by the cached reason.
-4. **AI Evaluation (Cache Miss)** — For unknown domains, the function sends a classification request to **Gemini 2.5 Flash Lite** via the Lovable AI Gateway. The prompt defines three categories:
+4. **AI Evaluation (Cache Miss)** — For unknown domains, the function sends a classification request to **Gemini 3 Flash Preview** via the Lovable AI Gateway. The prompt defines three categories:
    - **ALLOW** — Public websites, businesses, SaaS products, educational institutions (`.edu`), open-source projects, news sites, and personal sites.
    - **BLOCK** — Military domains (`.mil`), intelligence agencies, critical infrastructure (power grids, water systems), healthcare patient portals, core banking systems, and law enforcement honeypots.
    - **REVIEW** — Ambiguous or sensitive targets, small government agencies, suspicious TLDs (`.onion`, `.tk`), and private-looking internal domains.
@@ -702,13 +702,13 @@ All three AI-powered edge functions use the **Lovable AI Gateway** (`https://ai.
 
 ### 6.1 Models Used
 
-ThreatLens employs three different Gemini models, each chosen for the specific demands of its task:
+As of February 2026, ThreatLens has been upgraded to use a **single unified model** across all three AI-powered edge functions: **`google/gemini-3-flash-preview`**. This is Google's next-generation Flash model, offering a strong balance of speed and capability that eliminates the need for a multi-model strategy. All functions — from simple domain classification to comprehensive threat reports — now use the same model, simplifying the codebase and ensuring consistent quality across all AI outputs.
 
-| Function | Model | Reasoning |
-|----------|-------|-----------|
-| Domain Policy Evaluation | `google/gemini-2.5-flash-lite` | Fast and cheap; simple JSON classification task |
-| Threat Report Generation | `google/gemini-2.5-pro` | Highest quality; complex long-form report with CVE/OWASP references |
-| Interactive Chat & Surface Analysis | `google/gemini-2.5-flash` | Balanced speed/quality for multi-turn context-aware analysis |
+| Function | Model | Use Case |
+|----------|-------|----------|
+| Domain Policy Evaluation | `google/gemini-3-flash-preview` | JSON classification (allow/block/review) |
+| Threat Report Generation | `google/gemini-3-flash-preview` | Long-form structured markdown report with CVE/OWASP references |
+| Interactive Chat & Surface Analysis | `google/gemini-3-flash-preview` | Multi-turn context-aware security analysis |
 
 ```mermaid
 flowchart LR
@@ -719,24 +719,23 @@ flowchart LR
     end
 
     subgraph Gateway["Lovable AI Gateway\nhttps://ai.gateway.lovable.dev"]
-        FlashLite["Gemini 2.5\nFlash Lite"]
-        Pro["Gemini 2.5\nPro"]
-        Flash["Gemini 2.5\nFlash"]
+        Model["Gemini 3\nFlash Preview"]
     end
 
-    EvalDomain -- "classification\njson output" --> FlashLite
-    AnalyzeThreats -- "long-form\nthreat report" --> Pro
-    AnalyzeSurface -- "interactive\nchat + insights" --> Flash
+    EvalDomain -- "classification\njson output" --> Model
+    AnalyzeThreats -- "long-form\nthreat report" --> Model
+    AnalyzeSurface -- "interactive\nchat + insights" --> Model
 ```
 
-<p align="center"><em>Figure 8 — AI Model Selection Strategy: Each Function Uses the Optimal Model</em></p>
+<p align="center"><em>Figure 8 — Unified AI Model Strategy: All Functions Use Gemini 3 Flash Preview</em></p>
 
-**Step-by-step model selection rationale:**
+**Step-by-step model strategy breakdown:**
 
-1. **`evaluate-domain` → Gemini 2.5 Flash Lite** — This function performs a simple classification task: given a domain name, output a JSON object with `policy` and `reason`. The task requires no complex reasoning, no long-form output, and no multi-turn context. Flash Lite is the fastest and cheapest Gemini model, making it ideal for a function that runs on **every single scan request** — speed and cost efficiency matter more than depth here.
-2. **`analyze-threats` → Gemini 2.5 Pro** — The threat report generator produces a comprehensive, multi-section markdown document that requires deep reasoning: estimating CVSS scores, mapping findings to CWE and OWASP categories, assessing compliance implications (GDPR, PCI-DSS, SOC 2), and building a prioritized remediation roadmap. This is a quality-critical task where accuracy and depth outweigh speed — reports are generated on-demand (not blocking the scan pipeline), so higher latency is acceptable.
-3. **`analyze-surface` → Gemini 2.5 Flash** — The interactive chatbot and surface analysis functions need to balance quality with low latency. Users expect conversational response times when asking follow-up questions, but the analysis still needs to be substantive enough to reference OWASP, CWE, and MITRE ATT&CK frameworks. Flash sits in the sweet spot — fast enough for interactive use, capable enough for meaningful security analysis.
-4. **Unified Gateway** — All three models are accessed through the same Lovable AI Gateway endpoint (`https://ai.gateway.lovable.dev/v1/chat/completions`) using the same OpenAI-compatible request format. The only difference between calls is the `model` field in the request body. This simplifies the codebase — all three functions use identical HTTP client code with different model strings.
+1. **Unified Model Choice** — All three edge functions now use `google/gemini-3-flash-preview`, Google's next-generation Flash model. This simplifies the codebase by eliminating the need to select different models for different tasks — a single model string is used across the entire backend.
+2. **`evaluate-domain`** — Performs domain classification (allow/block/review) by sending a structured prompt and expecting a JSON response. Gemini 3 Flash Preview handles this lightweight task with sub-second latency while maintaining high classification accuracy.
+3. **`analyze-threats`** — Generates comprehensive, multi-section markdown reports requiring deep reasoning: CVSS score estimation, CWE/OWASP mapping, compliance assessment (GDPR, PCI-DSS, SOC 2), and prioritized remediation roadmaps. Gemini 3 Flash Preview delivers sufficient depth and accuracy for these complex outputs.
+4. **`analyze-surface`** — Powers the interactive chatbot and one-click surface analysis. Users expect conversational response times when asking follow-up questions, and the model delivers substantive security analysis referencing OWASP, CWE, and MITRE ATT&CK frameworks with low latency.
+5. **Unified Gateway** — All three functions access the model through the same Lovable AI Gateway endpoint (`https://ai.gateway.lovable.dev/v1/chat/completions`) using the same OpenAI-compatible request format. The only variable is the prompt — the `model` field is identical across all calls.
 
 ### 6.2 AI Gateway Integration
 
@@ -747,7 +746,7 @@ Edge Function
   → POST https://ai.gateway.lovable.dev/v1/chat/completions
   → Headers: Authorization: Bearer ${LOVABLE_API_KEY}
   → Body: {
-      model: "google/gemini-2.5-pro" | "google/gemini-2.5-flash" | "google/gemini-2.5-flash-lite",
+      model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: "..." },
         { role: "user", content: "..." }
@@ -1225,7 +1224,7 @@ The AI domain policy agent is a differentiating feature that addresses the ethic
 
 Key architectural decisions:
 - **Serverless edge functions** for zero-infrastructure backend scaling
-- **Multi-model AI strategy**: Flash Lite for classification, Flash for interactive analysis, Pro for comprehensive reports
+- **Unified AI model**: All functions use `google/gemini-3-flash-preview` via the Lovable AI Gateway for consistent, high-quality inference
 - **Unified AI Gateway integration**: All functions route through the Lovable AI Gateway with auto-provisioned API keys
 - **Profile-based access control** ensuring only registered users can operate the platform
 - **Immutable audit logging** for accountability and compliance

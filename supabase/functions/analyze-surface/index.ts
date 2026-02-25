@@ -158,7 +158,7 @@ Answer the analyst's question directly using the raw data. Interpret and context
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-3-flash-preview',
         messages: [
           { role: 'system', content: 'You are a Principal Cybersecurity Analyst specializing in web application security, penetration testing, and threat intelligence. Provide precise, actionable analysis. Reference OWASP, CWE, and MITRE ATT&CK where relevant. Be concise but thorough.' },
           { role: 'user', content: prompt },

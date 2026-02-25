@@ -29,12 +29,12 @@ The platform features an AI domain policy agent that prevents misuse by automati
 ## Key Features
 
 - **Automated Domain Scanning** — One-click reconnaissance via Firecrawl API with URL discovery (up to 500 endpoints), HTML parsing, and technology fingerprinting
-- **AI Domain Policy Agent** — Gemini Flash Lite-powered allowlist/blocklist system that auto-approves safe sites, blocks sensitive targets (.mil, critical infrastructure), and flags ambiguous domains for review
+- **AI Domain Policy Agent** — Gemini 3 Flash Preview-powered allowlist/blocklist system that auto-approves safe sites, blocks sensitive targets (.mil, critical infrastructure), and flags ambiguous domains for review
 - **Interactive AI Analyst** — Context-aware chatbot on every scan detail page with three analysis modes (Attack Surface, Findings, Raw Data) and suggested questions
 - **Attack Surface Analysis** — Discovered endpoints, client-side scripts, input vectors, external dependencies, and security header assessment with interactive tooltips
 - **Vulnerability Detection** — Missing security headers, exposed admin panels, suspicious query parameters, XSS input points, outdated libraries, and supply chain risks
 - **Risk Scoring** — Composite 0–100 score calculated from weighted severity findings (Critical: 25pts, High: 15pts, Medium: 8pts, Low: 3pts, Info: 1pt)
-- **AI Threat Reports** — One-click comprehensive reports with executive summary, vulnerability analysis, and remediation roadmap (Gemini Pro)
+- **AI Threat Reports** — One-click comprehensive reports with executive summary, vulnerability analysis, and remediation roadmap (Gemini 3 Flash Preview)
 - **PDF Export** — Professional branded reports with cover page, findings summary, AI insights, and confidential watermarking
 - **Scan Comparison** — Side-by-side delta analysis of risk scores, vulnerabilities, technologies, and endpoints between any two scans
 - **Authentication** — Google OAuth with profile-based registration gate and protected routes
@@ -70,7 +70,7 @@ graph TB
 
     subgraph External["EXTERNAL SERVICES"]
         Firecrawl["Firecrawl API\nWeb Scraping"]
-        AI["Lovable AI Gateway\nGemini Pro / Flash / Flash Lite"]
+        AI["Lovable AI Gateway\nGemini 3 Flash Preview"]
         Google["Google OAuth\nIdentity Provider"]
     end
 
@@ -81,7 +81,14 @@ graph TB
 
 <p align="center"><em>Figure 1 — ThreatLens System Architecture Overview</em></p>
 
-ThreatLens follows a three-tier architecture: a React SPA on the client, four serverless edge functions for backend compute, and PostgreSQL for persistence — all orchestrated through Lovable Cloud. Edge functions handle web scraping (Firecrawl), AI analysis (Lovable AI Gateway), and domain policy evaluation, while Google OAuth manages authentication. For a detailed breakdown of every component, data flow, and system interaction, see the [Technical Documentation](./TECHNICAL_DOCS.md).
+**Architecture breakdown:**
+
+- **Client Layer** — A React SPA (built with Vite + TypeScript) renders four main pages: Dashboard, Scan Detail, History/Compare, and Policies. All backend communication flows through a single Supabase JS client instance.
+- **Lovable Cloud** — Four serverless Deno edge functions handle all backend compute: scan orchestration, AI threat reports, interactive AI chat, and domain policy evaluation. PostgreSQL stores all persistent data (scans, findings, profiles, policies, audit logs), and Google OAuth manages authentication.
+- **External Services** — Two external APIs are consumed: Firecrawl for web scraping (HTML extraction + site mapping) and the Lovable AI Gateway for all AI inference. All three edge functions now route through a single model — `google/gemini-3-flash-preview` — for classification, interactive analysis, and report generation alike.
+- **Data Flow** — A user enters a domain → the policy agent evaluates it → Firecrawl scrapes and maps the site → parsed data is stored → findings are generated → the user can then trigger AI reports, chat with the AI analyst, or export PDFs.
+
+ThreatLens follows a three-tier architecture: a React SPA on the client, four serverless edge functions for backend compute, and PostgreSQL for persistence — all orchestrated through Lovable Cloud. For a detailed breakdown of every component, data flow, and system interaction, see the [Technical Documentation](./TECHNICAL_DOCS.md).
 
 ---
 
@@ -96,7 +103,7 @@ ThreatLens follows a three-tier architecture: a React SPA on the client, four se
 | **Backend** | Lovable Cloud (Supabase), Deno Edge Functions |
 | **Database** | PostgreSQL with Row Level Security |
 | **Auth** | Google OAuth (Lovable Cloud managed) |
-| **AI Models** | Google Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite |
+| **AI Models** | Google Gemini 3 Flash Preview (all functions) |
 | **Web Scraping** | Firecrawl API (scrape + map endpoints) |
 | **PDF Export** | jsPDF |
 | **Charts** | Recharts |
@@ -153,6 +160,6 @@ For comprehensive technical documentation covering every component, system flow,
 
 ## Conclusion
 
-ThreatLens demonstrates how modern AI capabilities can be combined with automated web reconnaissance to create a practical, accessible threat intelligence platform. By integrating Firecrawl's web scraping with multi-model AI analysis (Gemini Flash Lite for domain policy evaluation, Gemini Flash for interactive analysis, Gemini Pro for deep threat reports), the platform delivers actionable security insights that would traditionally require hours of manual penetration testing work.
+ThreatLens demonstrates how modern AI capabilities can be combined with automated web reconnaissance to create a practical, accessible threat intelligence platform. All AI-powered features — domain policy evaluation, interactive analysis, and comprehensive threat reports — are powered by Google's latest `gemini-3-flash-preview` model through the Lovable AI Gateway, delivering fast, high-quality inference across the board.
 
 The AI domain policy agent adds a critical layer of responsible use — ensuring the scanning capabilities cannot be weaponized against sensitive targets while maintaining ease of use for legitimate security assessments. The combination of automated detection, interactive AI analysis, and professional reporting makes ThreatLens a comprehensive tool for security professionals and organizations looking to understand and reduce their attack surface.
