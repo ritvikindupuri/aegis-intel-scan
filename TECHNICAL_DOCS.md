@@ -656,6 +656,101 @@ flowchart TD
 
 The edge functions above reference Firecrawl API calls extensively but only at a high level. The next section zooms into the scraping process itself — the specific API endpoints, request parameters, response structures, and data extraction logic that turn a domain name into structured security data.
 
+### 4.5 CVE Lookup Engine
+
+**File**: `supabase/functions/cve-lookup/index.ts`
+
+Performs real-time vulnerability lookups against the **NIST National Vulnerability Database (NVD) 2.0 API** for each technology detected during the scan. This replaces passive-only analysis with active CVE correlation.
+
+**Input**: `{ technologies: string[] }` — Array of detected technology names from the scan pipeline
+
+**Process**:
+1. **CPE Mapping** — Each technology is mapped to its Common Platform Enumeration (CPE) vendor/product pair via a built-in lookup table (e.g., `jQuery` → `jquery/jquery`, `WordPress` → `wordpress/wordpress`, `Nginx` → `f5/nginx`). Technologies without CPE mappings are skipped.
+2. **NVD API Query** — For each mapped technology, a keyword search is performed against `https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={vendor}+{product}&resultsPerPage=10`. The NVD rate limit (5 requests per 30 seconds without an API key) is respected via a 6.5-second delay between requests.
+3. **CVSS Extraction** — Each CVE result has its CVSS v3.1 (or v3.0 fallback) base score and severity extracted. If no CVSS data exists, severity is estimated from the score range (≥9 = critical, ≥7 = high, ≥4 = medium, <4 = low).
+4. **Finding Generation** — CVE results are converted to ThreatLens findings with the category `Known CVEs`, including the CVE ID, description (truncated to 500 chars), CVSS score, published date, and up to 3 reference URLs.
+5. **Integration** — The `firecrawl-scan` pipeline calls `cve-lookup` after generating passive findings and merges the CVE findings into the same deduplication + risk scoring pipeline.
+
+**Output**: Up to 50 CVEs sorted by CVSS score (descending), plus metadata about which technologies were checked vs skipped.
+
+**Supported Technologies** (CPE-mapped): jQuery, WordPress, React, Angular, Vue.js, Next.js, Bootstrap, Drupal, PHP, Nginx, ASP.NET, Shopify, HubSpot, Stripe
+
+### 4.6 Scheduled Scan Runner
+
+**File**: `supabase/functions/scheduled-scan-runner/index.ts`
+
+Executes automated recurring scans on a configurable schedule. Triggered every hour by a `pg_cron` job that calls the function via `pg_net`.
+
+**Process**:
+1. **Fetch Due Schedules** — Queries the `scan_schedules` table for all enabled schedules where `next_run_at <= now()`.
+2. **Execute Scans** — For each due schedule, internally calls the `firecrawl-scan` edge function with the scheduled domain.
+3. **Update Schedule** — After each scan (success or failure), updates `last_run_at`, `last_scan_id`, and calculates `next_run_at` based on the frequency (`daily` = +24h, `weekly` = +7d, `biweekly` = +14d, `monthly` = +30d).
+4. **Error Resilience** — If a scan fails, the schedule still advances its `next_run_at` to prevent infinite retry loops. Errors are logged but don't block other scheduled scans.
+
+**Cron Configuration**: `0 * * * *` (every hour at minute 0) via `pg_cron` + `pg_net` HTTP POST to the function endpoint.
+
+**`scan_schedules` Table**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Schedule identifier |
+| `user_id` | UUID | Owner of this schedule |
+| `domain` | TEXT | Target domain |
+| `frequency` | TEXT | `daily`, `weekly`, `biweekly`, `monthly` |
+| `enabled` | BOOLEAN | Whether this schedule is active |
+| `last_scan_id` | UUID (FK → scans) | Most recent scan produced |
+| `last_run_at` | TIMESTAMPTZ | When last executed |
+| `next_run_at` | TIMESTAMPTZ | When next execution is due |
+
+### 4.7 Public REST API Gateway
+
+**File**: `supabase/functions/api-gateway/index.ts`
+
+Provides programmatic access to ThreatLens functionality via API keys, enabling CI/CD integration, SIEM workflows, and third-party automation.
+
+**Authentication**: API key passed via `x-api-key` header. Keys are SHA-256 hashed before storage — only the prefix (`tl_XXXX...`) is stored in plaintext for identification. The full key is shown once at creation time and never stored.
+
+**Endpoints**:
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `POST` | `/scan` | `scan:create` | Start a new scan. Body: `{ "domain": "example.com" }` |
+| `GET` | `/scan/:id` | `scan:read` | Get scan details (status, risk score, technologies, enrichment) |
+| `GET` | `/scan/:id/findings` | `scan:read` | Get all findings for a scan |
+| `GET` | `/scans` | `scan:read` | List recent scans (query: `?limit=20`, max 100) |
+
+**Permission Model**: Each API key has an array of permissions (`scan:create`, `scan:read`, `findings:read`). The gateway checks permissions before executing each request and returns HTTP 403 if insufficient.
+
+**`api_keys` Table**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Key identifier |
+| `user_id` | UUID | Owner |
+| `key_hash` | TEXT (UNIQUE) | SHA-256 hash of the full API key |
+| `key_prefix` | TEXT | Display prefix (`tl_XXXX...`) |
+| `name` | TEXT | User-assigned label |
+| `permissions` | TEXT[] | Array of permission strings |
+| `last_used_at` | TIMESTAMPTZ | Last API call timestamp |
+| `expires_at` | TIMESTAMPTZ | Optional expiry date |
+
+**Example Usage**:
+```bash
+# Start a scan
+curl -X POST https://project.supabase.co/functions/v1/api-gateway/scan \
+  -H "x-api-key: tl_YourKeyHere" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "example.com"}'
+
+# Get scan results
+curl https://project.supabase.co/functions/v1/api-gateway/scan/{scanId} \
+  -H "x-api-key: tl_YourKeyHere"
+
+# Get findings
+curl https://project.supabase.co/functions/v1/api-gateway/scan/{scanId}/findings \
+  -H "x-api-key: tl_YourKeyHere"
+```
+
 ---
 
 ## 5. Firecrawl Web Scraping Process
