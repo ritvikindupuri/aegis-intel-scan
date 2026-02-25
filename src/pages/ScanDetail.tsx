@@ -489,16 +489,13 @@ const ScanDetail = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="max-h-48 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
-                      {(parsed.urls || []).slice(0, 50).map((url: string, i: number) => (
+                    <div className="max-h-64 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
+                      {(parsed.urls || []).map((url: string, i: number) => (
                         <div key={i} className="text-xs font-mono text-muted-foreground truncate hover:text-foreground transition-colors py-0.5 px-2 rounded hover:bg-secondary/60 flex items-center gap-1.5">
                           <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-50" />
                           {url}
                         </div>
                       ))}
-                      {(parsed.urls || []).length > 50 && (
-                        <div className="text-[11px] text-muted-foreground pt-2 px-2">+ {(parsed.urls || []).length - 50} additional endpoints</div>
-                      )}
                     </div>
                     {(parsed.urls || []).length === 0 && <span className="text-xs text-muted-foreground">No endpoints discovered</span>}
                   </CardContent>
@@ -563,8 +560,8 @@ const ScanDetail = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="max-h-40 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
-                        {(parsed.externalDependencies || []).slice(0, 30).map((dep: string, i: number) => (
+                      <div className="max-h-48 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
+                        {(parsed.externalDependencies || []).map((dep: string, i: number) => (
                           <div key={i} className="text-xs font-mono text-muted-foreground truncate py-0.5 px-2 hover:text-foreground rounded hover:bg-secondary/60">{dep}</div>
                         ))}
                       </div>
