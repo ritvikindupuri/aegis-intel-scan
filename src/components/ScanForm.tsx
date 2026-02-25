@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { startScan, evaluateDomain } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
   const [domain, setDomain] = useState("");
@@ -34,6 +35,11 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
             : `${evaluation.reason}`,
           variant: "destructive",
           duration: 8000,
+          action: (
+            <ToastAction altText="Go to Policies" onClick={() => navigate("/policies")}>
+              Go to Policies
+            </ToastAction>
+          ),
         });
         setLoading(false);
         return;
