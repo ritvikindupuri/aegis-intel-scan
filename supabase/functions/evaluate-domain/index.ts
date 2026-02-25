@@ -116,9 +116,14 @@ Respond with ONLY valid JSON (no markdown):
     });
 
     if (!response.ok) {
-      console.error('AI proxy error:', await response.text());
-      // Default to review if AI fails
-      return { policy: 'review', reason: 'AI evaluation unavailable — flagged for manual review.' };
+      const errorText = await response.text();
+      console.error('AI proxy error:', errorText);
+      const statusHint = response.status === 429 
+        ? 'The AI evaluation service is temporarily rate-limited.' 
+        : response.status === 402 
+        ? 'AI evaluation credits have been exhausted.' 
+        : `The AI evaluation service returned an error (HTTP ${response.status}).`;
+      return { policy: 'review', reason: `${statusHint} This domain has been flagged for manual review — you can approve it on the Policies page to proceed with scanning.` };
     }
 
     const data = await response.json();
@@ -133,9 +138,9 @@ Respond with ONLY valid JSON (no markdown):
       }
     }
 
-    return { policy: 'review', reason: 'AI response unclear — flagged for manual review.' };
+    return { policy: 'review', reason: 'The AI returned an unparseable response for this domain. It has been flagged for manual review — you can approve it on the Policies page to proceed with scanning.' };
   } catch (e) {
     console.error('AI evaluation failed:', e);
-    return { policy: 'review', reason: 'AI evaluation error — flagged for manual review.' };
+    return { policy: 'review', reason: `AI evaluation encountered a network error. This domain has been flagged for manual review — you can approve it on the Policies page to proceed with scanning.` };
   }
 }

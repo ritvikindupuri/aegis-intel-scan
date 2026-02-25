@@ -29,8 +29,11 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
         const isBlocked = evaluation.policy === 'block';
         toast({
           title: isBlocked ? "Domain Blocked" : "Domain Under Review",
-          description: evaluation.reason,
+          description: isBlocked 
+            ? evaluation.reason 
+            : `${evaluation.reason}`,
           variant: "destructive",
+          duration: 8000,
         });
         setLoading(false);
         return;
