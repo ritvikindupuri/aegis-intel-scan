@@ -11,7 +11,7 @@
 
 ThreatLens is an AI-powered cybersecurity platform that automates threat intelligence gathering and attack surface mapping for web domains. It combines automated web crawling via the Firecrawl API with multi-model AI analysis to deliver comprehensive security assessments — including vulnerability detection, security header analysis, technology fingerprinting, and actionable remediation guidance.
 
-The platform features an AI domain policy agent that prevents misuse by automatically evaluating scan targets, an interactive AI analyst chatbot for deep-dive investigations, and a full reporting suite with PDF export capabilities. Built with a modern React frontend and serverless edge function backend, ThreatLens provides enterprise-grade threat intelligence in a streamlined, accessible interface.
+The platform features an AI domain policy agent that prevents misuse by automatically evaluating scan targets, an interactive AI analyst chatbot for deep-dive investigations, and a full reporting suite with PDF export capabilities.
 
 ---
 
@@ -28,76 +28,17 @@ The platform features an AI domain policy agent that prevents misuse by automati
 
 ## Key Features
 
-### Automated Domain Scanning
-- One-click domain reconnaissance via Firecrawl web scraping API
-- Automatic URL discovery and site mapping (up to 500 endpoints)
-- HTML parsing for forms, scripts, and external dependencies
-- Technology stack fingerprinting (React, WordPress, Angular, Cloudflare, etc.)
-
-### AI Domain Policy Agent
-- AI-powered allowlist/blocklist system using Google Gemini Flash Lite
-- **Auto-approve**: Safe public websites, businesses, SaaS products
-- **Auto-block**: Military domains, critical infrastructure, intelligence agencies
-- **Flag for review**: Ambiguous or sensitive domains
-- Full scan audit log tracking every evaluation decision
-- Manual policy override via the Policies management page
-
-### Interactive AI Analyst Chatbot
-- Context-aware AI assistant available on every scan detail page
-- Three analysis contexts: Attack Surface, Findings, Raw Data
-- Pre-built suggested questions for common security assessments
-- Professional markdown rendering with tables, bold text, bullets, and code blocks
-- Copy-to-clipboard on every AI response
-
-### Attack Surface Analysis
-- **Discovered Endpoints**: All crawled URL paths with clickable stat cards
-- **Client-Side Scripts**: JavaScript files that may expose API keys or internal routes
-- **Input Vectors**: HTML forms as potential injection points (XSS, SQLi, CSRF)
-- **External Dependencies**: Third-party resources representing supply chain risk
-- **Security Headers**: Analysis of CSP, HSTS, X-Frame-Options, and more
-- Interactive tooltips explaining the security implications of each metric
-
-### Vulnerability Detection
-- Missing security header detection (CSP, HSTS, X-Frame-Options, etc.)
-- Exposed admin panel and sensitive path discovery
-- Suspicious query parameter identification (redirect, file, cmd, etc.)
-- Potential XSS input point detection
-- Outdated library and CMS risk assessment
-- Supply chain dependency risk scoring
-
-### Risk Scoring & Severity Classification
-- Composite risk score (0-100) calculated from findings
-- Severity levels: Critical (25pts), High (15pts), Medium (8pts), Low (3pts), Info (1pt)
-- Color-coded risk gauges and severity badges throughout the UI
-- Risk distribution dashboard with breakdown by severity
-
-### AI Threat Reports
-- One-click AI-generated comprehensive threat intelligence reports
-- Executive summary, vulnerability analysis, and remediation roadmap
-- Professional markdown formatting with tables and structured sections
-- Copy report to clipboard functionality
-
-### PDF Export
-- Professional PDF report generation with jsPDF
-- Branded cover page, table of contents, and confidential watermarking
-- Includes findings, technologies, attack surface data, and AI insights
-- Paginated with headers, footers, and report IDs
-
-### Scan Comparison
-- Side-by-side comparison of any two completed scans
-- Delta analysis: new/removed findings, tech changes, risk score diff
-- URL and technology overlap visualization
-
-### Authentication & Access Control
-- Google OAuth sign-in/sign-up via Lovable Cloud
-- Separate sign-up and sign-in flows with profile-based registration gate
-- Protected routes — unauthenticated users redirected to login
-- User avatar and email displayed in header
-
-### Scan History & Management
-- Chronological scan history with status badges and risk scores
-- Delete scans with confirmation dialog (cascading to findings)
-- Dashboard with aggregate stats: total scans, unique domains, avg risk, total vulnerabilities
+- **Automated Domain Scanning** — One-click reconnaissance via Firecrawl API with URL discovery (up to 500 endpoints), HTML parsing, and technology fingerprinting
+- **AI Domain Policy Agent** — Gemini Flash Lite-powered allowlist/blocklist system that auto-approves safe sites, blocks sensitive targets (.mil, critical infrastructure), and flags ambiguous domains for review
+- **Interactive AI Analyst** — Context-aware chatbot on every scan detail page with three analysis modes (Attack Surface, Findings, Raw Data) and suggested questions
+- **Attack Surface Analysis** — Discovered endpoints, client-side scripts, input vectors, external dependencies, and security header assessment with interactive tooltips
+- **Vulnerability Detection** — Missing security headers, exposed admin panels, suspicious query parameters, XSS input points, outdated libraries, and supply chain risks
+- **Risk Scoring** — Composite 0–100 score calculated from weighted severity findings (Critical: 25pts, High: 15pts, Medium: 8pts, Low: 3pts, Info: 1pt)
+- **AI Threat Reports** — One-click comprehensive reports with executive summary, vulnerability analysis, and remediation roadmap (Gemini Pro)
+- **PDF Export** — Professional branded reports with cover page, findings summary, AI insights, and confidential watermarking
+- **Scan Comparison** — Side-by-side delta analysis of risk scores, vulnerabilities, technologies, and endpoints between any two scans
+- **Authentication** — Google OAuth with profile-based registration gate and protected routes
+- **Scan History** — Chronological management with delete capability, aggregate dashboard stats, and risk distribution visualization
 
 ---
 
@@ -140,20 +81,7 @@ graph TB
 
 <p align="center"><em>Figure 1 — ThreatLens System Architecture Overview</em></p>
 
-### Architecture Explanation
-
-The diagram above illustrates the three-tier architecture of ThreatLens. Data flows from the **Client Layer** (a single-page React application) through the **Supabase JS Client**, which communicates with the **Lovable Cloud Backend**. The backend consists of a PostgreSQL database for persistence, four serverless Edge Functions for compute, and an OAuth authentication layer. The Edge Functions reach out to **External Services** — Firecrawl for web scraping, the Lovable AI Gateway for multi-model AI inference, and Google for identity verification. This separation ensures the client never directly touches external APIs or database internals, and all sensitive operations (API keys, AI inference, data writes) happen server-side.
-
-**Edge Functions**:
-- `firecrawl-scan` — Orchestrates the full scan pipeline: crawling, parsing, finding generation, and risk scoring
-- `analyze-threats` — Generates comprehensive AI threat reports from scan data using Gemini Pro
-- `analyze-surface` — Powers the interactive AI analyst chatbot with context-specific prompts
-- `evaluate-domain` — AI domain policy agent that gates scan requests before execution
-
-**External Services**:
-- **Firecrawl API** — Web scraping (scrape endpoint) and site mapping (map endpoint)
-- **Lovable AI Gateway** — Multi-model AI inference (Gemini Pro, Gemini Flash, Gemini Flash Lite) for threat analysis
-- **Google OAuth** — User authentication via managed SSO
+ThreatLens follows a three-tier architecture: a React SPA on the client, four serverless edge functions for backend compute, and PostgreSQL for persistence — all orchestrated through Lovable Cloud. Edge functions handle web scraping (Firecrawl), AI analysis (Lovable AI Gateway), and domain policy evaluation, while Google OAuth manages authentication. For a detailed breakdown of every component, data flow, and system interaction, see the [Technical Documentation](./TECHNICAL_DOCS.md).
 
 ---
 
@@ -217,7 +145,7 @@ The diagram above illustrates the three-tier architecture of ThreatLens. Data fl
 
 ## Technical Documentation
 
-For comprehensive technical documentation covering every component, system flow, AI integration, and security architecture in detail, see:
+For comprehensive technical documentation covering every component, system flow, AI integration, database schema, and security architecture in detail, see:
 
 **[TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md)**
 
