@@ -836,16 +836,19 @@ For organizations scanning the same domain periodically, the Compare page enable
 - Each card includes an info tooltip explaining what the metric means for the analyst
 
 **Risk Score Change** (detailed):
-- Large side-by-side numeric display (color-coded: ≥75 critical, ≥50 high, ≥25 medium, <25 low)
-- Numeric delta with sign and color
+- Color-coded risk level cards for both scans (Critical ≥75, High ≥50, Medium ≥25, Low <25) with large numeric display
+- Prominent delta indicator with contextual label: "RISK INCREASED" (red), "RISK DECREASED" (green), or "NO CHANGE"
+- **What Drove This Change** — Auto-generated plain-language explanation listing severity-level shifts (e.g., "2 new critical findings detected", "1 high finding no longer detected")
+- **How to Read This** — Inline explainer showing the scoring formula (`Critical×25 + High×15 + Medium×8 + Low×3 + Info×1`, capped at 100) with a contextual interpretation of the delta direction
 - **Severity Breakdown** — Per-severity bar chart comparison (critical → info), showing A and B counts side-by-side with progress bars and delta indicators. Allows analysts to see whether the risk shift is driven by new critical findings or just informational noise
 
-**Vulnerability Delta** (3-column card):
-- **New** — Findings present in B but not A, shown with severity badge, title, and category, highlighted with a red "Action Required" tag
-- **Resolved** — Findings present in A but not B, shown with strike-through text and green "Improvement" tag
-- **Persistent** — Findings present in both scans, shown with "Unresolved" tag — these represent the backlog
+**Finding Delta** (3-column card):
+- **Newly Detected** — Findings present in the current scan but absent from the baseline, shown with severity badge, title, and category, highlighted with an "Investigate" tag. Contextual note explains these represent new attack vectors or previously hidden surfaces
+- **No Longer Detected** — Findings present in the baseline but absent from the current scan. Explicitly noted as *not confirmed remediation* — the target may have patched, reconfigured, added authentication, or the finding may be intermittent
+- **Still Present** — Findings detected in both scans, indicating the target's attack surface still exposes these weaknesses
 - Matching logic: findings are diffed by title (exact string match)
 - Each finding card shows both severity badge and category label for faster triage
+- This terminology deliberately avoids "resolved" or "unresolved" since the app performs passive reconnaissance, not vulnerability management
 
 **Technology Stack Changes**:
 - Grouped into three labeled sections: Added (green + border), Removed (red − border), Unchanged (neutral chips)
@@ -856,10 +859,18 @@ For organizations scanning the same domain periodically, the Compare page enable
 - **Removed Endpoints** — URLs in A but not B, described as "possibly decommissioned services"
 - **Unchanged summary** — Footer line showing how many endpoints are stable between scans
 
+**AI Analyst Chatbot** (compare context):
+- An `AiChatPanel` instance is rendered at the bottom of the comparison view, scoped to the `compare` context
+- Context data passed includes both scan summaries, the full finding delta (newly detected, no longer detected, still present), technology diff, and endpoint counts
+- Suggested questions: "Explain the risk score change in plain language", "What are the most concerning newly detected findings?", "Has the attack surface expanded or contracted?", "What infrastructure changes should the analyst investigate?"
+- The `compare_chat` handler in the `analyze-surface` edge function is instructed to respect passive recon semantics — it will never claim a finding is "fixed" just because it's no longer detected
+- Uses `google/gemini-3-flash-preview` via the Lovable AI Gateway
+
 <p align="center">
   <img src="https://i.imgur.com/iW4XrM2.png" alt="Scan Comparison Page" width="900" />
 </p>
-<p align="center"><em>Figure 6 — Scan Comparison — Side-by-side delta analysis showing risk score change, vulnerability diff, technology changes, and endpoint changes</em></p>
+<p align="center"><em>Figure 6 — Scan Comparison — Side-by-side delta analysis with risk score explanation, finding delta (Newly Detected / No Longer Detected / Still Present), technology & endpoint changes, and AI analyst chatbot</em></p>
+
 
 #### `Policies.tsx` — Domain Policy Management
 This page is the human override layer on top of the AI policy agent — allowing administrators to manually approve, block, or flag domains, and review the full audit trail:
