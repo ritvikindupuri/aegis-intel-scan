@@ -42,6 +42,8 @@ export async function startScan(domain: string): Promise<{ scanId: string }> {
     body: { domain },
   });
   if (error) throw new Error(error.message);
+  // If crawl failed but we have a scanId, return it so user can see the failed state
+  if (data?.scanId) return { scanId: data.scanId };
   if (data?.error) throw new Error(data.error);
   return { scanId: data.scanId };
 }

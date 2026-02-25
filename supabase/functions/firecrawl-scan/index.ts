@@ -74,8 +74,8 @@ serve(async (req) => {
         status: 'failed',
         error_message: scrapeData.error || 'Firecrawl scrape failed',
       }).eq('id', currentScanId);
-      return new Response(JSON.stringify({ error: 'Crawl failed', scanId: currentScanId }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      return new Response(JSON.stringify({ success: false, scanId: currentScanId, error: scrapeData.error || 'Firecrawl scrape failed' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
