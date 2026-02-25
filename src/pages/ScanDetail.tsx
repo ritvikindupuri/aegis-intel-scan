@@ -90,7 +90,7 @@ const ScanDetail = () => {
   // Build surface context for AI chat
   const surfaceContextData = {
     securityHeaders: parsed.securityHeaders,
-    endpoints: parsed.urls || [],
+    endpoints: parsed.endpoints || parsed.urls || [],
     jsFiles: parsed.jsFiles || [],
     forms: parsed.forms || [],
     externalDependencies: parsed.externalDependencies || [],
@@ -371,9 +371,9 @@ const ScanDetail = () => {
                           </tr>
                           <tr className="border-b border-border/50 hover:bg-secondary/30">
                             <td className="py-2 px-3 flex items-center gap-2"><Link2 className="h-3 w-3 text-primary" /> Endpoints</td>
-                            <td className="text-center py-2 px-3">{(parsed.urls || []).length}</td>
-                            <td className="py-2 px-3">{(parsed.urls || []).length} discovered</td>
-                            <td className="py-2 px-3 font-sans text-muted-foreground">{(parsed.urls || []).length > 50 ? "High — large surface" : (parsed.urls || []).length > 15 ? "Medium" : "Low"}</td>
+                            <td className="text-center py-2 px-3">{(parsed.endpoints || parsed.urls || []).length}</td>
+                            <td className="py-2 px-3">{(parsed.endpoints || parsed.urls || []).length} discovered</td>
+                            <td className="py-2 px-3 font-sans text-muted-foreground">{(parsed.endpoints || parsed.urls || []).length > 50 ? "High — large surface" : (parsed.endpoints || parsed.urls || []).length > 15 ? "Medium" : "Low"}</td>
                           </tr>
                           <tr className="border-b border-border/50 hover:bg-secondary/30">
                             <td className="py-2 px-3 flex items-center gap-2"><ExternalLink className="h-3 w-3 text-primary" /> External Deps</td>
@@ -497,19 +497,19 @@ const ScanDetail = () => {
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
-                      <Link2 className="h-3.5 w-3.5 text-primary" /> Discovered Endpoints ({(parsed.urls || []).length})
+                      <Link2 className="h-3.5 w-3.5 text-primary" /> Discovered Endpoints ({(parsed.endpoints || parsed.urls || []).length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="max-h-64 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
-                      {(parsed.urls || []).map((url: string, i: number) => (
+                      {(parsed.endpoints || parsed.urls || []).map((url: string, i: number) => (
                         <div key={i} className="text-xs font-mono text-muted-foreground truncate hover:text-foreground transition-colors py-0.5 px-2 rounded hover:bg-secondary/60 flex items-center gap-1.5">
                           <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-50" />
                           {url}
                         </div>
                       ))}
                     </div>
-                    {(parsed.urls || []).length === 0 && <span className="text-xs text-muted-foreground">No endpoints discovered</span>}
+                    {(parsed.endpoints || parsed.urls || []).length === 0 && <span className="text-xs text-muted-foreground">No endpoints discovered</span>}
                   </CardContent>
                 </Card>
 
