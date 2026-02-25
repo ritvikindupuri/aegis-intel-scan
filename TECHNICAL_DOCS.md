@@ -1432,6 +1432,226 @@ The API layer is the single point of contact between the React frontend and the 
 
 This API layer completes the full-stack picture — from the database schema (Section 3) through edge functions (Section 4) to the frontend components (Section 7) and now the client-side abstraction that ties them together.
 
+Beyond the frontend API layer, ThreatLens also exposes a public REST API for programmatic access — documented in the next section.
+
+---
+
+## 13.1 REST API (Programmatic Access)
+
+**File**: `supabase/functions/api-gateway/index.ts`
+
+The REST API gateway enables external tools, scripts, and CI/CD pipelines to interact with ThreatLens without the web UI. Authentication uses SHA-256 hashed API keys passed via the `x-api-key` header. Keys are generated from the **Settings → API Keys** tab in the dashboard.
+
+### Use Cases
+
+- A **DevOps pipeline** that automatically scans your production domain after every deployment
+- A **Python script** that pulls scan findings into a Slack channel or SIEM
+- A **third-party tool** that triggers scans and reads results via HTTP
+- A **monitoring dashboard** that polls scan status and aggregates risk scores across domains
+
+### Authentication
+
+All requests require the `x-api-key` header. The gateway hashes the provided key with SHA-256 and looks it up in the `api_keys` table. If the key is missing, invalid, or expired, the request is rejected with `401 Unauthorized`.
+
+```
+x-api-key: tl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Key properties stored in the database:**
+
+| Field | Description |
+|-------|-------------|
+| `key_hash` | SHA-256 hash of the raw key (raw key is never stored) |
+| `key_prefix` | First 7 characters (e.g., `tl_abc1`) for identification in the UI |
+| `permissions` | Array of permission strings: `scan:create`, `scan:read`, `findings:read` |
+| `expires_at` | Optional expiry timestamp (null = never expires) |
+| `last_used_at` | Updated on every successful request |
+
+### Endpoints
+
+#### `POST /scan` — Start a New Scan
+
+Triggers the full scan pipeline (domain evaluation → Firecrawl scrape → analysis → findings generation).
+
+**Permission required**: `scan:create`
+
+**Request body:**
+```json
+{
+  "domain": "example.com"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "scanId": "79a2def6-f88b-4cf8-b95b-f82c03769b00",
+  "urlsFound": 47,
+  "findingsCount": 12,
+  "riskScore": 62
+}
+```
+
+**Response (400 — missing domain):**
+```json
+{
+  "error": "domain is required in request body"
+}
+```
+
+**Example:**
+```bash
+curl -X POST https://your-url/functions/v1/api-gateway/scan \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: tl_your_key_here" \
+  -d '{"domain": "example.com"}'
+```
+
+---
+
+#### `GET /scan/:id` — Get Scan Details
+
+Returns the full scan record including status, risk score, technologies, and enrichment data.
+
+**Permission required**: `scan:read`
+
+**Response (200):**
+```json
+{
+  "id": "79a2def6-f88b-4cf8-b95b-f82c03769b00",
+  "domain": "example.com",
+  "status": "completed",
+  "risk_score": 62,
+  "urls_found": 47,
+  "vulnerabilities_found": 12,
+  "technologies": ["React", "Nginx", "Google Analytics"],
+  "enrichment": {
+    "whois": { "registrar": "...", "created": "..." },
+    "hosting": { "ip": "...", "country": "US", "isp": "..." },
+    "riskFactors": ["High URL count", "Multiple external dependencies"]
+  },
+  "error_message": null,
+  "created_at": "2026-02-25T10:30:00Z",
+  "updated_at": "2026-02-25T10:31:45Z"
+}
+```
+
+**Response (404):**
+```json
+{
+  "error": "Scan not found"
+}
+```
+
+**Example:**
+```bash
+curl -H "x-api-key: tl_your_key_here" \
+  https://your-url/functions/v1/api-gateway/scan/79a2def6-f88b-4cf8-b95b-f82c03769b00
+```
+
+---
+
+#### `GET /scan/:id/findings` — Get Findings for a Scan
+
+Returns all vulnerability findings for a specific scan, ordered by newest first.
+
+**Permission required**: `findings:read`
+
+**Response (200):**
+```json
+{
+  "scanId": "79a2def6-f88b-4cf8-b95b-f82c03769b00",
+  "findings": [
+    {
+      "id": "a1b2c3d4-...",
+      "title": "Missing Content-Security-Policy Header",
+      "description": "The server does not set a CSP header, allowing potential XSS attacks.",
+      "severity": "high",
+      "category": "Security Headers",
+      "details": {
+        "header": "Content-Security-Policy",
+        "recommendation": "Add a strict CSP header to prevent inline script execution."
+      },
+      "created_at": "2026-02-25T10:31:00Z"
+    }
+  ],
+  "count": 12
+}
+```
+
+**Example:**
+```bash
+curl -H "x-api-key: tl_your_key_here" \
+  https://your-url/functions/v1/api-gateway/scan/SCAN_ID/findings
+```
+
+---
+
+#### `GET /scans` — List Recent Scans
+
+Returns a paginated list of recent scans (default 20, max 100).
+
+**Permission required**: `scan:read`
+
+**Query parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | integer | 20 | Max results (capped at 100) |
+
+**Response (200):**
+```json
+{
+  "scans": [
+    {
+      "id": "79a2def6-...",
+      "domain": "example.com",
+      "status": "completed",
+      "risk_score": 62,
+      "urls_found": 47,
+      "vulnerabilities_found": 12,
+      "created_at": "2026-02-25T10:30:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Example:**
+```bash
+curl -H "x-api-key: tl_your_key_here" \
+  "https://your-url/functions/v1/api-gateway/scans?limit=50"
+```
+
+---
+
+### Error Responses
+
+All error responses follow a consistent format:
+
+```json
+{
+  "error": "Human-readable error message"
+}
+```
+
+| Status | Cause |
+|--------|-------|
+| `400` | Missing required field (e.g., `domain`) |
+| `401` | Missing, invalid, or expired API key |
+| `403` | Key lacks required permission |
+| `404` | Scan not found or unknown endpoint |
+| `500` | Internal server error or upstream failure |
+
+### Security Model
+
+- **Key hashing**: Raw keys are never stored. Only the SHA-256 hash is persisted in the `api_keys` table.
+- **Permission scoping**: Each key carries an array of permissions (`scan:create`, `scan:read`, `findings:read`). The gateway checks the required permission for each endpoint before executing.
+- **Expiry enforcement**: Keys with an `expires_at` timestamp are rejected after expiry.
+- **Usage tracking**: `last_used_at` is updated on every successful authentication, visible in the Settings UI.
+- **Service role isolation**: The gateway uses `SUPABASE_SERVICE_ROLE_KEY` internally to bypass RLS, but external callers never see this key — they only interact via their scoped API key.
+
 ---
 
 ## 14. Conclusion
