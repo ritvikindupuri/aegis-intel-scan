@@ -20,6 +20,7 @@
    - 3.3 [profiles Table](#33-profiles-table)
    - 3.4 [domain_policies Table](#34-domain_policies-table)
    - 3.5 [scan_audit_log Table](#35-scan_audit_log-table)
+   - 3.6 [Entity Relationship Diagram](#36-entity-relationship-diagram)
 4. [Edge Functions (Backend)](#4-edge-functions-backend)
    - 4.1 [Firecrawl Scan Pipeline](#41-firecrawl-scan-pipeline)
    - 4.2 [AI Threat Report Generator](#42-ai-threat-report-generator)
@@ -31,7 +32,6 @@
 6. [AI Integration](#6-ai-integration)
    - 6.1 [Models Used](#61-models-used)
    - 6.2 [AI Gateway Integration](#62-ai-gateway-integration)
-   - 6.3 [AI Proxy Integration (Domain Policy)](#63-ai-proxy-integration-domain-policy)
 7. [Frontend Components](#7-frontend-components)
    - 7.1 [Pages](#71-pages)
    - 7.2 [Core Components](#72-core-components)
@@ -66,53 +66,54 @@ The platform is designed with three core principles:
 
 ### 2.1 High-Level Data Flow
 
+```mermaid
+flowchart TD
+    A["User enters domain"] --> B["evaluate-domain\nAI Policy Check\n(Gemini Flash Lite)"]
+    B --> C{"Allowed?"}
+    C -- "NO" --> D["Block / Review\nShow reason to user"]
+    C -- "YES" --> E["firecrawl-scan\nOrchestration Edge Function"]
+    
+    E --> F["Firecrawl API\n/v1/scrape\nHTML + links + metadata"]
+    E --> G["Firecrawl API\n/v1/map\nSite map (200 URLs)"]
+    
+    F --> H["Parse Results"]
+    G --> H
+    
+    H --> H1["Extract endpoints,\nJS files, forms, deps"]
+    H --> H2["Detect technologies\n(20 regex patterns)"]
+    H --> H3["Analyze security headers\nfrom metadata"]
+    H --> H4["Generate enrichment\n(WHOIS, hosting, risk)"]
+    
+    H1 --> I["Generate Findings"]
+    H2 --> I
+    H3 --> I
+    H4 --> I
+    
+    I --> I1["Security header gaps"]
+    I --> I2["Sensitive path detection"]
+    I --> I3["Suspicious query params"]
+    I --> I4["XSS input points"]
+    I --> I5["Technology risk"]
+    I --> I6["Supply chain analysis"]
+    
+    I1 --> J["Calculate Risk Score\n(0-100, capped)"]
+    I2 --> J
+    I3 --> J
+    I4 --> J
+    I5 --> J
+    I6 --> J
+    
+    J --> K["Store in PostgreSQL\nscans + findings tables"]
+    K --> L["Display in Scan Detail UI\nauto-polls every 3s"]
+    
+    L --> M["analyze-threats\nAI Report (Gemini Pro)"]
+    L --> N["analyze-surface\nAI Chat (Gemini Flash)"]
+    L --> O["PDF Export\n(jsPDF)"]
 ```
-User enters domain
-        |
-        v
-[evaluate-domain] -- AI Policy Check (Gemini Flash Lite)
-        |
-   allowed? ----NO----> Block/Review (show reason to user)
-        |
-       YES
-        |
-        v
-[firecrawl-scan] -- Orchestration Edge Function
-        |
-        +---> Firecrawl API /v1/scrape (HTML + links + metadata)
-        +---> Firecrawl API /v1/map (site map, up to 200 URLs)
-        |
-        v
-    Parse Results
-        |
-        +---> Extract endpoints, JS files, forms, external deps
-        +---> Detect technologies (regex pattern matching)
-        +---> Analyze security headers from metadata
-        +---> Generate enrichment data (WHOIS, hosting, risk factors)
-        |
-        v
-    Generate Findings
-        |
-        +---> Security header gaps
-        +---> Sensitive path detection
-        +---> Suspicious query parameters
-        +---> XSS input point identification
-        +---> Technology risk assessment
-        +---> Supply chain analysis
-        |
-        v
-    Calculate Risk Score (0-100)
-        |
-        v
-    Store in PostgreSQL (scans + findings tables)
-        |
-        v
-    Display in Scan Detail UI (auto-polls every 3s until complete)
-        |
-        +---> [analyze-threats] -- Generate AI Report (Gemini Pro)
-        +---> [analyze-surface] -- Interactive AI Chat (Gemini Flash)
-        +---> PDF Export (jsPDF)
-```
+
+<p align="center"><em>Figure 1 — End-to-End Data Flow: From Domain Input to Intelligence Output</em></p>
+
+**Flow Explanation:** The diagram traces the complete lifecycle of a scan request. When a user enters a domain, it first passes through the **AI Domain Policy Agent** (`evaluate-domain`), which classifies the domain as allowed, blocked, or review using Gemini Flash Lite. Only allowed domains proceed to the **Firecrawl Scan Pipeline** (`firecrawl-scan`), which orchestrates two Firecrawl API calls — a scrape for full HTML content and a map for site-wide URL discovery. The raw data then enters a multi-stage **parsing pipeline** that extracts endpoints, JavaScript files, HTML forms, external dependencies, and technologies via 20 regex patterns. Security headers are analyzed from the response metadata, and enrichment data (WHOIS, hosting info) is generated. The parsed data feeds into a **finding generation engine** that checks for security header gaps, sensitive exposed paths, suspicious query parameters, XSS input points, technology risks, and supply chain vulnerabilities. Each finding is assigned a severity (critical/high/medium/low/info), and a **composite risk score** is calculated from the weighted sum (capped at 100). Everything is persisted to PostgreSQL, and the frontend polls every 3 seconds until the scan completes. From the completed scan, users can trigger three output paths: an **AI threat report** (Gemini Pro), an **interactive AI chatbot** (Gemini Flash), or a **PDF export** (jsPDF).
 
 ### 2.2 Component Architecture
 
@@ -129,7 +130,7 @@ src/
 ├── components/
 │   ├── AppLayout.tsx     # Header nav, logo, user avatar popover, sign out
 │   ├── AuthProvider.tsx  # Session context provider (onAuthStateChange + getSession)
-│   ├── ScanForm.tsx      # Domain input with two-phase submit (evaluate → scan)
+│   ├── ScanForm.tsx      # Domain input with two-phase submit (evaluate then scan)
 │   ├── AiChatPanel.tsx   # Interactive AI analyst chatbot with markdown rendering
 │   ├── AiSurfaceInsight.tsx  # One-click AI analysis button for surface sections
 │   ├── RiskScoreBreakdown.tsx # Detailed risk visualization with bar chart
@@ -154,21 +155,38 @@ supabase/functions/
 └── evaluate-domain/      # AI domain policy evaluation (Gemini Flash Lite)
 ```
 
+<p align="center"><em>Figure 2 — Project File Structure and Component Organization</em></p>
+
 ### 2.3 Routing & Protected Routes
 
-The application uses React Router v6 with a `ProtectedRoute` wrapper component defined in `App.tsx`:
-
+```mermaid
+flowchart LR
+    subgraph Public
+        AuthPage["/auth -- Auth.tsx"]
+        NotFound["/* -- NotFound.tsx"]
+    end
+    
+    subgraph Protected["Protected (requires session)"]
+        Index["/ -- Index.tsx\nDashboard"]
+        Scan["/scan/:id -- ScanDetail.tsx"]
+        HistoryPage["/history -- History.tsx"]
+        Compare["/compare -- Compare.tsx"]
+        PoliciesPage["/policies -- Policies.tsx"]
+    end
+    
+    AuthPage -- "session exists" --> Index
+    NoSession["No session"] -- "redirect" --> AuthPage
+    
+    Index --> AppLayout["Wrapped in\nAppLayout + PageTransition"]
+    Scan --> AppLayout
+    HistoryPage --> AppLayout
+    Compare --> AppLayout
+    PoliciesPage --> AppLayout
 ```
-/auth         → Auth.tsx (public — redirects to / if already authenticated)
-/             → Index.tsx (protected)
-/scan/:id     → ScanDetail.tsx (protected)
-/history      → History.tsx (protected)
-/compare      → Compare.tsx (protected)
-/policies     → Policies.tsx (protected)
-*             → NotFound.tsx (public)
-```
 
-Each protected route is wrapped with `AppLayout` (header + navigation) and `PageTransition` (Framer Motion animations). The `ProtectedRoute` component checks `useAuth()` session state — unauthenticated users are redirected to `/auth`.
+<p align="center"><em>Figure 3 — Application Routing Map with Protected Route Guards</em></p>
+
+**Routing Explanation:** The application uses React Router v6 with a `ProtectedRoute` wrapper component defined in `App.tsx`. Public routes (`/auth` and the 404 catch-all) are accessible without authentication. All other routes are protected — if no session exists, the user is redirected to `/auth`. The `/auth` route itself checks for an existing session and redirects authenticated users to `/` to prevent accessing the login page when already signed in. Every protected route is wrapped with two higher-order components: `AppLayout` (which renders the sticky header with navigation, logo, and user avatar popover) and `PageTransition` (which applies Framer Motion fade + slide animations for smooth page transitions).
 
 ---
 
@@ -244,6 +262,68 @@ Immutable log of all domain evaluation attempts.
 | `reason` | TEXT | Evaluation reason (prefixed with "Existing policy:" or "AI evaluation:") |
 | `created_at` | TIMESTAMPTZ | Timestamp |
 
+### 3.6 Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    scans ||--o{ findings : "has many"
+    scans {
+        uuid id PK
+        text domain
+        text status
+        int risk_score
+        int urls_found
+        int vulnerabilities_found
+        jsonb technologies
+        jsonb raw_crawl_data
+        jsonb parsed_data
+        jsonb enrichment
+        text ai_report
+        text error_message
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    findings {
+        uuid id PK
+        uuid scan_id FK
+        text title
+        text description
+        text severity
+        text category
+        jsonb details
+        timestamptz created_at
+    }
+    profiles {
+        uuid id PK
+        uuid user_id UK
+        text email
+        text display_name
+        text avatar_url
+        timestamptz created_at
+    }
+    domain_policies {
+        uuid id PK
+        text domain UK
+        text policy_type
+        text reason
+        boolean ai_evaluated
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    scan_audit_log {
+        uuid id PK
+        text domain
+        text action
+        text reason
+        timestamptz created_at
+    }
+    domain_policies ||--o{ scan_audit_log : "generates"
+```
+
+<p align="center"><em>Figure 4 — Database Entity Relationship Diagram</em></p>
+
+**Schema Explanation:** The database has five tables. The `scans` table is the central entity — each scan produces multiple `findings` (one-to-many relationship via `scan_id` foreign key). The `profiles` table stores user registration data keyed by `user_id` and is the only table with Row Level Security restricted to the owning user. The `domain_policies` table caches AI and manual domain classifications, and each policy evaluation (whether from cache or fresh AI inference) generates an entry in the `scan_audit_log` for immutable audit tracking. The `scans` and `findings` tables are open-access (shared scan data), while `profiles` enforces per-user access control.
+
 ---
 
 ## 4. Edge Functions (Backend)
@@ -256,68 +336,57 @@ This is the core orchestration function that manages the entire scan lifecycle. 
 
 #### Process Flow
 
+```mermaid
+flowchart TD
+    Input["INPUT: domain, scanId?"] --> A["Create scan record\nstatus: crawling"]
+    A --> B["Format target URL\nadd https:// if missing"]
+    B --> C["Firecrawl /v1/scrape\nformats: markdown, html, links\nonlyMainContent: false"]
+    C --> D{"Scrape\nsucceeded?"}
+    D -- "NO" --> E["Mark scan as FAILED\nreturn error"]
+    D -- "YES" --> F["Firecrawl /v1/map\nlimit: 200 URLs\n(non-blocking)"]
+    F --> G["Parse Results"]
+    
+    G --> G1["Merge + deduplicate URLs\n(scrape.links + map.links)"]
+    G --> G2["detectTechnologies()\n20 regex patterns vs HTML"]
+    G --> G3["Extract JS files\n.js .mjs .jsx .ts .tsx"]
+    G --> G4["extractForms()\nparse form tags (max 20)"]
+    G --> G5["Filter external deps\ndifferent hostname"]
+    G --> G6["Filter endpoints\nquery params + API patterns"]
+    G --> G7["analyzeSecurityFromMeta()\n7 security headers"]
+    
+    G1 --> H["Generate Enrichment\nWHOIS, hosting, risk factors"]
+    G2 --> H
+    G3 --> H
+    G4 --> H
+    G5 --> H
+    G6 --> H
+    G7 --> H
+    
+    H --> I["Update scan\nstatus: analyzing\nstore parsed_data"]
+    I --> J["generateFindings()"]
+    
+    J --> J1["Security headers\nCSP, HSTS, X-Frame"]
+    J --> J2["Sensitive paths\nadmin, .env, .git"]
+    J --> J3["Suspicious params\nredirect, cmd, exec"]
+    J --> J4["XSS inputs\nsearch, query, comment"]
+    J --> J5["Tech risks\njQuery, WordPress"]
+    J --> J6["Supply chain\nexternal dep count"]
+    
+    J1 --> K["Insert findings\ninto database"]
+    J2 --> K
+    J3 --> K
+    J4 --> K
+    J5 --> K
+    J6 --> K
+    
+    K --> L["calculateRiskScore()\ncritical:25 high:15\nmedium:8 low:3 info:1\ncapped at 100"]
+    L --> M["Update scan\nstatus: completed\nrisk_score, vuln count"]
+    M --> Output["OUTPUT:\nscanId, urlsFound\nfindingsCount, riskScore"]
 ```
-INPUT: { domain: string, scanId?: string }
-         |
-         v
-1. Create scan record (status: "crawling") or use existing scanId
-         |
-         v
-2. Format target URL (add https:// if missing)
-         |
-         v
-3. Firecrawl /v1/scrape
-   - Formats: markdown, html, links
-   - onlyMainContent: false (full page)
-   - On failure: mark scan as failed, return error
-         |
-         v
-4. Firecrawl /v1/map
-   - Limit: 200 URLs
-   - Non-blocking: continues if map fails
-         |
-         v
-5. Parse Results
-   |-- Merge and deduplicate URLs from scrape.links + map.links
-   |-- detectTechnologies() — 20 regex patterns against HTML
-   |-- Extract JS files (*.js, *.mjs, *.jsx, *.ts, *.tsx)
-   |-- extractForms() — parse <form> tags for action, method, inputs (max 20)
-   |-- Filter external dependencies (different hostname from target)
-   |-- Filter endpoints (URLs with ? or API-like path patterns)
-   |-- analyzeSecurityFromMeta() — check 7 security headers from metadata
-         |
-         v
-6. Generate Enrichment
-   |-- Simulated WHOIS data (registrar, dates, nameservers)
-   |-- Hosting provider detection (Cloudflare check from tech stack)
-   |-- Risk factor assessment (hasLogin, isEcommerce, usesCDN, surfaceSize)
-         |
-         v
-7. Update scan (status: "analyzing", store parsed_data, technologies, enrichment)
-         |
-         v
-8. generateFindings()
-   |-- Security header checks (CSP, HSTS, X-Frame-Options)
-   |-- Sensitive path patterns (admin, config, .env, .git, phpmyadmin)
-   |-- Suspicious query parameters (redirect, url, file, cmd, exec, etc.)
-   |-- Form XSS input detection (search, query, q, keyword, comment, message)
-   |-- Technology risk assessment (jQuery → low, WordPress → medium)
-   |-- Supply chain dependency count (>10 external deps → low)
-         |
-         v
-9. Insert findings into database
-         |
-         v
-10. calculateRiskScore()
-    |-- critical: +25, high: +15, medium: +8, low: +3, info: +1
-    |-- Capped at 100
-         |
-         v
-11. Update scan (status: "completed", risk_score, vulnerabilities_found)
-         |
-         v
-OUTPUT: { success, scanId, urlsFound, findingsCount, riskScore }
-```
+
+<p align="center"><em>Figure 5 — Firecrawl Scan Pipeline: Complete Orchestration Flow</em></p>
+
+**Pipeline Explanation:** This is the most complex edge function in ThreatLens. It begins by creating a scan record in the database (status: `crawling`), then makes two sequential Firecrawl API calls — first a **scrape** for full HTML content, links, and metadata, then a **map** for a broader site URL inventory. If the scrape fails, the scan is immediately marked as failed. The map call is non-blocking (continues if it fails). The raw data then enters a seven-step **parsing phase**: URL deduplication and capping (500 max), technology detection via 20 regex patterns against the HTML source, JavaScript file extraction by file extension, HTML form parsing (capped at 20 forms), external dependency filtering by hostname comparison, endpoint filtering for API-like URL patterns, and security header analysis from response metadata. After parsing, **enrichment data** is generated (simulated WHOIS, hosting provider detection, risk factor assessment). The scan status is updated to `analyzing`, and the **finding generation engine** runs six categories of checks — each producing findings with severity labels. All findings are batch-inserted into the database, a **risk score** is calculated from the weighted severity sum (capped at 100), and the scan is finalized as `completed`.
 
 #### Technology Detection
 
@@ -418,43 +487,34 @@ Powers both the interactive AI chatbot (`AiChatPanel`) and the one-click AI anal
 
 The gatekeeper function that evaluates every scan request before execution.
 
-**Decision Flow**:
+```mermaid
+flowchart TD
+    Input["INPUT: domain"] --> A["Clean domain\nlowercase, strip protocol/path"]
+    A --> B["Check domain_policies table\nfor existing policy"]
+    B --> C{"Policy\nexists?"}
+    C -- "YES" --> D["Return stored policy\n+ log to audit_log"]
+    C -- "NO" --> E["AI Evaluation\nGemini 2.5 Flash Lite\nvia Lovable AI Gateway"]
+    
+    E --> F{"AI response\nparseable?"}
+    F -- "YES" --> G{"Policy\ntype?"}
+    F -- "NO" --> H["Fallback: review\nwith descriptive error reason"]
+    
+    G --> G1["ALLOW\nPublic sites, businesses,\nSaaS, education, open-source"]
+    G --> G2["BLOCK\nMilitary .mil, intelligence,\ncritical infrastructure,\nhoneypots"]
+    G --> G3["REVIEW\nAmbiguous, small gov,\nsuspicious TLDs"]
+    
+    G1 --> I["Store policy in\ndomain_policies table\nai_evaluated: true"]
+    G2 --> I
+    G3 --> I
+    H --> I
+    
+    I --> J["Log to scan_audit_log\napproved / blocked / flagged"]
+    J --> Output["OUTPUT:\nallowed, policy,\nreason, ai_evaluated"]
+```
 
-```
-INPUT: { domain }
-        |
-        v
-1. Clean domain (lowercase, strip protocol/path)
-        |
-        v
-2. Check domain_policies table for existing policy
-        |
-   EXISTS? ----YES----> Return stored policy + log to audit_log
-        |
-        NO
-        |
-        v
-3. AI Evaluation (Gemini 2.5 Flash Lite via Supabase ai-proxy)
-   |
-   Prompt classification rules:
-   |-- ALLOW: Public sites, businesses, SaaS, news, education, open-source
-   |-- BLOCK: Military (.mil), intelligence agencies, critical infrastructure,
-   |          healthcare patient portals, core banking, honeypots
-   |-- REVIEW: Ambiguous, small government, suspicious TLDs, private-looking domains
-        |
-        v
-4. Parse AI JSON response: { policy, reason }
-   |-- Fallback to "review" if AI fails, errors, or response unclear
-        |
-        v
-5. Store policy in domain_policies table (ai_evaluated: true)
-        |
-        v
-6. Log to scan_audit_log (action: approved/blocked/flagged)
-        |
-        v
-OUTPUT: { allowed: boolean, policy, reason, ai_evaluated }
-```
+<p align="center"><em>Figure 6 — AI Domain Policy Agent: Evaluation Decision Flow</em></p>
+
+**Policy Agent Explanation:** Every scan request passes through this gatekeeper before any crawling begins. The domain is first cleaned (lowercased, protocol and path stripped), then checked against the `domain_policies` table for an existing cached policy. If a policy exists, it's returned immediately with an audit log entry — no AI call is needed. For unknown domains, the function invokes **Gemini 2.5 Flash Lite** via the Lovable AI Gateway with a classification prompt that defines three categories: **ALLOW** (public websites, businesses, SaaS, education, open-source), **BLOCK** (military, intelligence agencies, critical infrastructure, healthcare patient portals, banking, honeypots), and **REVIEW** (ambiguous, small government, suspicious TLDs). The AI responds with a JSON object containing the policy and a human-readable reason. If the AI call fails (rate limit, network error, unparseable response), the function defaults to `review` with a descriptive error message explaining *why* it failed — e.g., "The AI evaluation service is temporarily rate-limited" or "AI evaluation encountered a network error." The policy is stored in `domain_policies` for future cache hits, and an audit log entry is created for accountability.
 
 ---
 
@@ -462,65 +522,40 @@ OUTPUT: { allowed: boolean, policy, reason, ai_evaluated }
 
 ### 5.1 Scraping Flow Diagram
 
+```mermaid
+flowchart TD
+    Target["TARGET: https://example.com"] --> Scrape
+
+    subgraph Scrape["FIRECRAWL /v1/scrape"]
+        S1["Request:\nurl, formats: markdown + html + links\nonlyMainContent: false"]
+        S2["Response:\ndata.html -- Raw HTML\ndata.links -- Discovered URLs\ndata.metadata -- HTTP headers\ndata.markdown -- Page content"]
+        S1 --> S2
+    end
+
+    Scrape --> Map
+
+    subgraph Map["FIRECRAWL /v1/map"]
+        M1["Request:\nurl, limit: 200"]
+        M2["Response:\nlinks -- Full site map URLs\n(non-blocking: continues if fails)"]
+        M1 --> M2
+    end
+
+    Map --> Merge
+
+    subgraph Merge["DATA MERGING AND PARSING"]
+        P1["1. Deduplicate URLs\nfrom scrape.links + map.links\n2. Cap at 500 URLs"]
+        P2["From merged URLs:\n- JS files (.js, .mjs, .jsx, .ts, .tsx)\n- External deps (diff hostname)\n- Endpoints (API patterns + query params)"]
+        P3["From raw HTML:\n- Forms (action, method, inputs) -- max 20\n- Technologies (20 regex patterns)"]
+        P4["From metadata:\n7 security headers:\nCSP, HSTS, X-Frame-Options,\nX-Content-Type-Options, X-XSS,\nReferrer-Policy, Permissions-Policy"]
+        P1 --> P2
+        P1 --> P3
+        P1 --> P4
+    end
 ```
-TARGET: https://example.com
-              |
-              v
-+------- FIRECRAWL /v1/scrape --------+
-|                                      |
-|  Request:                            |
-|    url: "https://example.com"        |
-|    formats: [markdown, html, links]  |
-|    onlyMainContent: false            |
-|                                      |
-|  Response:                           |
-|    data.html     → Raw HTML          |
-|    data.links    → Discovered URLs   |
-|    data.metadata → HTTP headers      |
-|    data.markdown → Page content      |
-+------------------+-------------------+
-                   |
-                   v
-+------- FIRECRAWL /v1/map ------------+
-|                                      |
-|  Request:                            |
-|    url: "https://example.com"        |
-|    limit: 200                        |
-|                                      |
-|  Response:                           |
-|    links → Full site map URLs        |
-|                                      |
-|  (Non-blocking: continues if fails)  |
-+------------------+-------------------+
-                   |
-                   v
-+------- DATA MERGING & PARSING -------+
-|                                      |
-|  1. Deduplicate URLs from            |
-|     scrape.links + map.links         |
-|  2. Cap at 500 URLs                  |
-|                                      |
-|  From merged URLs:                   |
-|   - JS files (*.js, *.mjs, *.jsx,   |
-|     *.ts, *.tsx)                     |
-|   - External deps (diff hostname)    |
-|   - Endpoints (API patterns +        |
-|     query params)                    |
-|                                      |
-|  From raw HTML:                      |
-|   - Forms (action, method, input     |
-|     names) — max 20 forms            |
-|   - Technologies (20 regex patterns  |
-|     against full HTML)               |
-|                                      |
-|  From metadata:                      |
-|   - 7 security headers:             |
-|     CSP, HSTS, X-Frame-Options,     |
-|     X-Content-Type-Options, X-XSS,  |
-|     Referrer-Policy,                 |
-|     Permissions-Policy               |
-+--------------------------------------+
-```
+
+<p align="center"><em>Figure 7 — Firecrawl Web Scraping Pipeline: Two-Phase Data Acquisition and Parsing</em></p>
+
+**Scraping Explanation:** The scraping process uses two Firecrawl API endpoints in sequence. The **/v1/scrape** endpoint retrieves the full HTML content, all hyperlinks, HTTP response metadata (headers), and a markdown representation of the page — with `onlyMainContent: false` to capture the entire page including navigation, footers, and hidden elements. The **/v1/map** endpoint then discovers additional URLs across the site (capped at 200) by following the sitemap and internal links. The map call is non-blocking — if it fails, the pipeline continues with scrape data alone. In the **merging phase**, URLs from both sources are deduplicated and capped at 500. Three parallel extraction paths run: (1) from the merged URL list, JavaScript files are identified by extension, external dependencies are filtered by hostname comparison, and endpoints are detected by query parameter presence or API-like URL patterns; (2) from the raw HTML, forms are parsed using regex to extract action URLs, methods, and input field names (max 20 forms), and technologies are detected via 20 regex patterns; (3) from the response metadata, 7 security headers are checked — present values are stored, missing ones are marked as "Not Set."
 
 ### 5.2 Data Extraction Details
 
@@ -543,26 +578,49 @@ Extracts: action URL, HTTP method, input field names (capped at 20 forms).
 
 ## 6. AI Integration
 
-ThreatLens uses **two different AI integration patterns** depending on the function. No user API keys are required — all AI access is managed by Lovable Cloud.
+All three AI-powered edge functions use the **Lovable AI Gateway** (`https://ai.gateway.lovable.dev/v1/chat/completions`) for inference. No user API keys are required — the `LOVABLE_API_KEY` environment variable is auto-provisioned by Lovable Cloud.
 
 ### 6.1 Models Used
 
-| Function | Model | Integration | Reasoning |
-|----------|-------|-------------|-----------|
-| Domain Policy Evaluation | `google/gemini-2.5-flash-lite` | Supabase AI Proxy | Fast, cheap; simple JSON classification task |
-| Threat Report Generation | `google/gemini-2.5-pro` | Lovable AI Gateway | Highest quality; complex long-form report with CVE/OWASP refs |
-| Interactive Chat & Surface Analysis | `google/gemini-2.5-flash` | Lovable AI Gateway | Balanced speed/quality for multi-turn context-aware analysis |
+| Function | Model | Reasoning |
+|----------|-------|-----------|
+| Domain Policy Evaluation | `google/gemini-2.5-flash-lite` | Fast and cheap; simple JSON classification task |
+| Threat Report Generation | `google/gemini-2.5-pro` | Highest quality; complex long-form report with CVE/OWASP references |
+| Interactive Chat & Surface Analysis | `google/gemini-2.5-flash` | Balanced speed/quality for multi-turn context-aware analysis |
+
+```mermaid
+flowchart LR
+    subgraph EdgeFunctions["Edge Functions"]
+        EvalDomain["evaluate-domain"]
+        AnalyzeThreats["analyze-threats"]
+        AnalyzeSurface["analyze-surface"]
+    end
+
+    subgraph Gateway["Lovable AI Gateway\nhttps://ai.gateway.lovable.dev"]
+        FlashLite["Gemini 2.5\nFlash Lite"]
+        Pro["Gemini 2.5\nPro"]
+        Flash["Gemini 2.5\nFlash"]
+    end
+
+    EvalDomain -- "classification\njson output" --> FlashLite
+    AnalyzeThreats -- "long-form\nthreat report" --> Pro
+    AnalyzeSurface -- "interactive\nchat + insights" --> Flash
+```
+
+<p align="center"><em>Figure 8 — AI Model Selection Strategy: Each Function Uses the Optimal Model</em></p>
+
+**Model Strategy Explanation:** ThreatLens employs a deliberate multi-model strategy where each function uses the AI model best suited to its task complexity and latency requirements. **Gemini 2.5 Flash Lite** handles domain policy evaluation — a simple JSON classification task that needs to be fast and cheap since it runs on every scan request. **Gemini 2.5 Pro** (the most capable model) generates comprehensive threat reports that require deep reasoning about CVE references, CVSS scoring, OWASP mapping, and compliance implications — quality matters more than speed here since reports are generated on-demand. **Gemini 2.5 Flash** powers the interactive chatbot and surface analysis, balancing response quality with the low latency needed for conversational interactions. All three route through the same Lovable AI Gateway endpoint, authenticated via the auto-provisioned `LOVABLE_API_KEY`.
 
 ### 6.2 AI Gateway Integration
 
-Used by `analyze-threats` and `analyze-surface`. These functions use the Lovable AI Gateway directly:
+All edge functions use the same integration pattern:
 
 ```
 Edge Function
   → POST https://ai.gateway.lovable.dev/v1/chat/completions
   → Headers: Authorization: Bearer ${LOVABLE_API_KEY}
   → Body: {
-      model: "google/gemini-2.5-pro" | "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-pro" | "google/gemini-2.5-flash" | "google/gemini-2.5-flash-lite",
       messages: [
         { role: "system", content: "..." },
         { role: "user", content: "..." }
@@ -571,26 +629,12 @@ Edge Function
   → Response: { choices: [{ message: { content: string } }] }
 ```
 
-**Authentication**: Uses `LOVABLE_API_KEY` environment variable (auto-provided by Lovable Cloud).
+**Authentication**: Uses `LOVABLE_API_KEY` environment variable (auto-provided by Lovable Cloud). This key is managed automatically — users never need to configure it.
 
-### 6.3 AI Proxy Integration (Domain Policy)
-
-Used by `evaluate-domain`. Routes through the Supabase AI Proxy:
-
-```
-Edge Function
-  → POST ${SUPABASE_URL}/functions/v1/ai-proxy
-  → Headers: Authorization: Bearer ${SUPABASE_ANON_KEY}
-  → Body: {
-      model: "google/gemini-2.5-flash-lite",
-      messages: [{ role: "user", content: "..." }]
-    }
-  → Response: { choices: [{ message: { content: string } }] }
-```
-
-**Authentication**: Uses `SUPABASE_ANON_KEY` (auto-provided).
-
-**Why different patterns?** The evaluate-domain function was implemented using the Supabase ai-proxy pattern, while the analysis functions use the Lovable AI Gateway directly. Both achieve the same result — AI inference without requiring user API keys.
+**Error Handling**: All functions handle three error states:
+- **429 Too Many Requests** — Rate limited; returns descriptive message to user
+- **402 Payment Required** — Credits exhausted; surfaces billing guidance
+- **Network/Parse errors** — Falls back gracefully with explanatory messages
 
 ---
 
@@ -722,7 +766,7 @@ The most complex page. **Four tabs**:
   1. `evaluateDomain()` — checks AI policy agent
   2. `startScan()` — only if domain is allowed
 - Policy status badge (green = allow, red = block, amber = review) with AI reasoning text
-- Blocks scan if domain is blocked or under review (shows destructive toast)
+- Blocks scan if domain is blocked or under review (shows destructive toast with "Go to Policies" action button)
 - Navigates to `/scan/{scanId}` on success
 
 #### `AuthProvider.tsx`
@@ -776,60 +820,32 @@ Built on **shadcn/ui** with Radix primitives. Key components actively used:
 
 ### 8.1 Auth Flow Diagram
 
+```mermaid
+flowchart TD
+    A["User visits app"] --> B["AuthProvider:\nonAuthStateChange + getSession"]
+    B --> C{"Session\nexists?"}
+    C -- "YES" --> D["Render protected routes"]
+    C -- "NO" --> E["ProtectedRoute:\nRedirect to /auth"]
+    E --> F["User sees\nSign In / Sign Up tabs"]
+    F --> G["User clicks Google button"]
+    G --> H["localStorage.setItem\nauth_intent = signin or signup"]
+    H --> I["lovable.auth.signInWithOAuth\ngoogle, redirect_uri"]
+    I --> J["Google OAuth consent\nredirect back to app"]
+    J --> K["onAuthStateChange fires\nwith new session"]
+    K --> L["handlePostAuth()"]
+    L --> M["Check profiles table\nfor user_id"]
+    M --> N{"Profile\nexists?"}
+    N -- "YES" --> O["Navigate to /"]
+    N -- "NO" --> P{"auth_intent\n=== signup?"}
+    P -- "YES" --> Q["Insert profile\nemail, display_name, avatar_url"]
+    Q --> R["localStorage.removeItem\nauth_intent"]
+    R --> O
+    P -- "NO" --> S["signOut()\ntoast: No account found"]
 ```
-User visits app
-      |
-      v
-AuthProvider: onAuthStateChange + getSession
-      |
-  session? ----YES----> Render protected routes
-      |
-      NO
-      |
-      v
-ProtectedRoute: <Navigate to="/auth" />
-      |
-      v
-User sees Sign In / Sign Up tabs
-      |
-      v
-User clicks Google button
-      |
-      v
-localStorage.setItem("auth_intent", "signin" | "signup")
-      |
-      v
-lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin })
-      |
-      v
-Google OAuth consent → redirect back to app
-      |
-      v
-onAuthStateChange fires with new session
-      |
-      v
-handlePostAuth():
-      |
-      v
-Check profiles table for user_id (.maybeSingle())
-      |
-  profile EXISTS?
-      |          |
-     YES         NO
-      |          |
-  Navigate     Check localStorage "auth_intent"
-  to "/"            |
-                intent === "signup"?
-                    |          |
-                   YES         NO
-                    |          |
-                 Insert       signOut() +
-                 profile      toast "No account found"
-                    |
-              localStorage.removeItem("auth_intent")
-                    |
-                 Navigate to "/"
-```
+
+<p align="center"><em>Figure 9 — Authentication Flow: Google OAuth with Profile-Based Registration Gate</em></p>
+
+**Auth Flow Explanation:** ThreatLens uses a **profile-based registration gate** on top of Google OAuth. When a user visits the app, the `AuthProvider` checks for an existing session via `onAuthStateChange` and `getSession()`. Unauthenticated users are redirected to `/auth`, which shows Sign In and Sign Up tabs. Before initiating the OAuth flow, the app stores `auth_intent` ("signin" or "signup") in localStorage — this is critical because the Google OAuth redirect loses React state. After the OAuth consent flow completes and the user is redirected back, `onAuthStateChange` fires with the new session. The `handlePostAuth()` function then checks the `profiles` table for a matching `user_id`. If a profile exists, the user is navigated to the dashboard regardless of intent. If no profile exists and the intent was "signup," a new profile row is created with the user's Google metadata (email, display name, avatar URL). If no profile exists and the intent was "signin," the user is signed out with an error toast saying "No account found" — this prevents unregistered users from accessing the app even if they have a valid Google account. This dual-gate pattern ensures that only explicitly registered users can operate the platform.
 
 ### 8.2 Session Management
 
@@ -846,16 +862,27 @@ Check profiles table for user_id (.maybeSingle())
 
 ### Scoring Formula
 
+```mermaid
+flowchart LR
+    Findings["All Findings"] --> Critical["Critical\n25 pts each"]
+    Findings --> High["High\n15 pts each"]
+    Findings --> Medium["Medium\n8 pts each"]
+    Findings --> Low["Low\n3 pts each"]
+    Findings --> Info["Info\n1 pt each"]
+    
+    Critical --> Sum["Sum all\npoints"]
+    High --> Sum
+    Medium --> Sum
+    Low --> Sum
+    Info --> Sum
+    
+    Sum --> Cap["min(total, 100)"]
+    Cap --> Score["Risk Score\n0 - 100"]
 ```
-risk_score = min(100, Σ finding_scores)
 
-where finding_score =
-  critical: 25 points
-  high:     15 points
-  medium:    8 points
-  low:       3 points
-  info:      1 point
-```
+<p align="center"><em>Figure 10 — Risk Score Calculation: Weighted Severity Sum Capped at 100</em></p>
+
+**Scoring Explanation:** The risk score is calculated as a simple weighted sum of all findings, where each severity level contributes a fixed number of points: Critical findings add 25 points each (reflecting their potential for immediate exploitation), High adds 15, Medium adds 8, Low adds 3, and Info adds 1. The raw total is capped at 100 to provide a normalized scale. For example, a scan with 2 critical findings (50pts), 1 high (15pts), and 3 medium (24pts) would produce a raw total of 89, resulting in a risk score of 89. A scan with 5 critical findings (125pts raw) would be capped at 100.
 
 ### Score Interpretation
 
@@ -969,7 +996,8 @@ The AI policy agent enforces responsible use:
 - `firecrawl-scan`, `analyze-threats`, `analyze-surface`: JWT verification disabled (`verify_jwt = false` in `config.toml`) — accessible without auth token
 - `evaluate-domain`: Not listed in config.toml — uses default settings
 - All functions use CORS headers allowing all origins
-- `firecrawl-scan` and `evaluate-domain` use `SUPABASE_SERVICE_ROLE_KEY` for database writes
+- `firecrawl-scan` uses `SUPABASE_SERVICE_ROLE_KEY` for database writes
+- `evaluate-domain` uses `SUPABASE_SERVICE_ROLE_KEY` for database writes + `LOVABLE_API_KEY` for AI
 - `analyze-threats` and `analyze-surface` use `LOVABLE_API_KEY` for AI gateway access
 
 ---
@@ -1004,7 +1032,7 @@ The AI domain policy agent is a differentiating feature that addresses the ethic
 Key architectural decisions:
 - **Serverless edge functions** for zero-infrastructure backend scaling
 - **Multi-model AI strategy**: Flash Lite for classification, Flash for interactive analysis, Pro for comprehensive reports
-- **Two AI integration patterns**: Supabase AI Proxy for lightweight calls, Lovable AI Gateway for heavy inference
+- **Unified AI Gateway integration**: All functions route through the Lovable AI Gateway with auto-provisioned API keys
 - **Profile-based access control** ensuring only registered users can operate the platform
 - **Immutable audit logging** for accountability and compliance
 - **Dark-mode cybersecurity aesthetic** with custom CSS design tokens, glass morphism, gradient text, and Framer Motion animations
@@ -1015,4 +1043,3 @@ The platform is designed to be extended with additional scanning modules, AI mod
 ---
 
 *ThreatLens Technical Documentation — Confidential*
-*Built with [Lovable](https://lovable.dev)*
