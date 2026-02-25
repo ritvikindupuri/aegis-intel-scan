@@ -46,6 +46,15 @@ export async function generateReport(scanId: string): Promise<string> {
   return data.report;
 }
 
+export async function analyzeSurface(section: string, data: any, domain: string): Promise<string> {
+  const { data: result, error } = await supabase.functions.invoke('analyze-surface', {
+    body: { section, data, domain },
+  });
+  if (error) throw new Error(error.message);
+  if (result?.error) throw new Error(result.error);
+  return result.analysis;
+}
+
 export async function getScans(): Promise<Scan[]> {
   const { data, error } = await supabase
     .from('scans')
