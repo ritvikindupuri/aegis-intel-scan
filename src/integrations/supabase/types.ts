@@ -14,7 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      findings: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          details: Json | null
+          id: string
+          scan_id: string
+          severity: string
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          details?: Json | null
+          id?: string
+          scan_id: string
+          severity?: string
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          details?: Json | null
+          id?: string
+          scan_id?: string
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "findings_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scans: {
+        Row: {
+          ai_report: string | null
+          created_at: string
+          domain: string
+          enrichment: Json | null
+          error_message: string | null
+          id: string
+          parsed_data: Json | null
+          raw_crawl_data: Json | null
+          risk_score: number | null
+          status: string
+          technologies: Json | null
+          updated_at: string
+          urls_found: number | null
+          vulnerabilities_found: number | null
+        }
+        Insert: {
+          ai_report?: string | null
+          created_at?: string
+          domain: string
+          enrichment?: Json | null
+          error_message?: string | null
+          id?: string
+          parsed_data?: Json | null
+          raw_crawl_data?: Json | null
+          risk_score?: number | null
+          status?: string
+          technologies?: Json | null
+          updated_at?: string
+          urls_found?: number | null
+          vulnerabilities_found?: number | null
+        }
+        Update: {
+          ai_report?: string | null
+          created_at?: string
+          domain?: string
+          enrichment?: Json | null
+          error_message?: string | null
+          id?: string
+          parsed_data?: Json | null
+          raw_crawl_data?: Json | null
+          risk_score?: number | null
+          status?: string
+          technologies?: Json | null
+          updated_at?: string
+          urls_found?: number | null
+          vulnerabilities_found?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
