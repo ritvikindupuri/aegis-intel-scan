@@ -23,9 +23,52 @@ ThreatLens is an AI-powered cybersecurity platform that automates threat intelli
 - **PDF Export** — Professional branded reports with cover page, findings summary, AI insights, and confidential watermarking
 - **Scan Comparison** — Side-by-side delta analysis of risk scores, vulnerabilities, technologies, and endpoints between any two scans
 - **Authentication** — Google OAuth with profile-based registration gate and protected routes
-- **Scan History** — Chronological management with delete capability, aggregate dashboard stats, and risk distribution visualization
+- **Scheduled / Recurring Scans** — Configure daily, weekly, biweekly, or monthly automated scans from the Settings page. A backend cron job checks hourly for due schedules and triggers scans automatically.
+- **REST API & Programmatic Access** — Generate API keys to trigger scans, retrieve results, and pull findings from scripts, CI/CD pipelines, SIEMs, or any HTTP client — no UI required.
+- **Real CVE Vulnerability Scanning** — Detected technologies are matched against the NIST NVD 2.0 database to surface known CVEs with severity scores and reference links.
+- **Per-User Rate Limiting** — Configurable daily scan quotas (default 10/day) prevent Firecrawl credit exhaustion and enforce fair usage.
+- **Real WHOIS & Geolocation Enrichment** — Live RDAP lookups and ip-api.com geolocation replace all simulated data with real-time registration, hosting, and network details.
 
 ---
+
+## REST API (Programmatic Access)
+
+The ThreatLens REST API lets you integrate security scanning into your existing workflows — CI/CD pipelines, automation scripts, SIEMs, or custom dashboards. Generate an API key from the **Settings → API Keys** tab, then use it to trigger scans and retrieve results without the web UI.
+
+### Use Cases
+
+- A **DevOps pipeline** that automatically scans your production domain after every deployment
+- A **Python script** that pulls scan findings into a Slack channel or SIEM
+- A **third-party tool** that triggers scans and reads results via HTTP
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/functions/v1/api-gateway/scan` | Start a new scan |
+| `GET` | `/functions/v1/api-gateway/scan/:id` | Get scan details (status, risk score, technologies) |
+| `GET` | `/functions/v1/api-gateway/scan/:id/findings` | List all findings (CVEs, misconfigs) |
+| `GET` | `/functions/v1/api-gateway/scans` | List recent scans (`?limit=20`) |
+
+### Example
+
+```bash
+# Start a scan
+curl -X POST https://your-url/functions/v1/api-gateway/scan \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: tl_your_key_here" \
+  -d '{"domain": "example.com"}'
+
+# Get results
+curl -H "x-api-key: tl_your_key_here" \
+  https://your-url/functions/v1/api-gateway/scan/SCAN_ID
+
+# Get findings
+curl -H "x-api-key: tl_your_key_here" \
+  https://your-url/functions/v1/api-gateway/scan/SCAN_ID/findings
+```
+
+All keys are hashed with SHA-256 — ThreatLens never stores raw keys. Each key is granted `scan:create`, `scan:read`, and `findings:read` permissions by default.
 
 ## System Architecture
 
