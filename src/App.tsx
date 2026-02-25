@@ -35,6 +35,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/auth" element={session ? <Navigate to="/" replace /> : <Auth />} />
+      <Route path="/auth/callback" element={<Auth />} />
+      <Route path="/~oauth" element={<Auth />} />
       <Route path="/" element={<ProtectedRoute><AppLayout><PageTransition><Index /></PageTransition></AppLayout></ProtectedRoute>} />
       <Route path="/scan/:id" element={<ProtectedRoute><AppLayout><PageTransition><ScanDetail /></PageTransition></AppLayout></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><AppLayout><PageTransition><History /></PageTransition></AppLayout></ProtectedRoute>} />
