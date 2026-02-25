@@ -16,7 +16,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    const { domain, verifyOwnership } = await req.json();
+    const { domain } = await req.json();
     if (!domain) {
       return new Response(JSON.stringify({ error: 'Domain is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -24,44 +24,6 @@ serve(async (req) => {
     }
 
     const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-
-    // DNS TXT ownership verification
-    if (verifyOwnership) {
-      const verified = await verifyDnsTxt(cleanDomain);
-      if (verified) {
-        // Store/update as verified-owner allow policy
-        await supabase.from('domain_policies').upsert({
-          domain: cleanDomain,
-          policy_type: 'allow',
-          reason: 'Domain ownership verified via DNS TXT record (threatlens-verify found).',
-          ai_evaluated: false,
-        }, { onConflict: 'domain' });
-
-        await supabase.from('scan_audit_log').insert({
-          domain: cleanDomain,
-          action: 'approved',
-          reason: 'DNS TXT ownership verification passed',
-        });
-
-        return new Response(JSON.stringify({
-          allowed: true,
-          policy: 'allow',
-          reason: 'Domain ownership verified via DNS TXT record.',
-          verified_owner: true,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } else {
-        return new Response(JSON.stringify({
-          allowed: false,
-          policy: 'review',
-          reason: 'DNS TXT verification failed. Add a TXT record with value "threatlens-verify" to prove ownership.',
-          verified_owner: false,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-    }
 
     // 1. Check existing policy
     const { data: existingPolicy } = await supabase
@@ -71,6 +33,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingPolicy) {
+      // Log the action
       await supabase.from('scan_audit_log').insert({
         domain: cleanDomain,
         action: existingPolicy.policy_type === 'allow' ? 'approved' : existingPolicy.policy_type === 'block' ? 'blocked' : 'flagged',
@@ -124,21 +87,6 @@ serve(async (req) => {
   }
 });
 
-async function verifyDnsTxt(domain: string): Promise<boolean> {
-  try {
-    const resp = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=TXT`);
-    if (!resp.ok) return false;
-    const data = await resp.json();
-    const answers = data.Answer || [];
-    return answers.some((a: any) =>
-      typeof a.data === 'string' && a.data.toLowerCase().includes('threatlens-verify')
-    );
-  } catch (e) {
-    console.error('DNS TXT lookup failed:', e);
-    return false;
-  }
-}
-
 async function evaluateWithAI(domain: string): Promise<{ policy: string; reason: string }> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) {
@@ -148,11 +96,9 @@ async function evaluateWithAI(domain: string): Promise<{ policy: string; reason:
   const prompt = `You are a security policy AI agent for a threat intelligence platform called ThreatLens. Your job is to evaluate whether a domain should be allowed for security scanning.
 
 RULES:
-- ALLOW: Domains that are well-known test/demo targets (e.g. example.com, httpbin.org, testhtml5.vulnweb.com), open-source project sites, and educational/documentation sites.
-- REVIEW: Commercial websites, SaaS products, businesses, news sites, personal sites, and any third-party domain the user likely does not own. These require explicit user confirmation that they have authorization. Also flag ambiguous domains — small government agencies, private internal-looking domains, domains with suspicious TLDs.
+- ALLOW: Public websites, businesses, open-source projects, personal sites, SaaS products, news sites, educational institutions. These are legitimate targets for security assessment.
 - BLOCK: Government military/intelligence domains (.mil, intelligence agencies), critical infrastructure (power grids, water systems), healthcare patient portals, financial institution core banking, domains that appear to be honeypots or law enforcement traps.
-
-IMPORTANT: Most commercial/third-party websites should be "review", NOT "allow". Only well-known intentional test targets should be auto-allowed.
+- REVIEW: Domains that are ambiguous — could be legitimate but also could be sensitive. Examples: small government agencies, private internal-looking domains, domains with suspicious TLDs.
 
 Evaluate this domain: "${domain}"
 
@@ -186,6 +132,7 @@ Respond with ONLY valid JSON (no markdown):
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
 
+    // Parse AI response
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
