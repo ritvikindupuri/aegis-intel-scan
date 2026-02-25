@@ -69,19 +69,29 @@ export function RiskScoreBreakdown({ score, findings }: RiskScoreBreakdownProps)
           </div>
         </div>
 
-        {/* Stacked severity bar */}
-        {activeContributions.length > 0 && (
+        {/* Bar chart */}
+        {contributions.some(c => c.count > 0) && (
           <div className="space-y-2">
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Contribution by Severity</div>
-            <div className="w-full h-3 bg-secondary rounded-full overflow-hidden flex">
-              {activeContributions.map(c => (
-                <div
-                  key={c.severity}
-                  className={`h-full ${c.bgColor} first:rounded-l-full last:rounded-r-full`}
-                  style={{ width: `${Math.max((c.rawPoints / Math.max(rawTotal, 1)) * 100, 2)}%` }}
-                  title={`${c.label}: ${c.rawPoints}pts`}
-                />
-              ))}
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Point Contribution</div>
+            <div className="flex items-end gap-2 h-28 pt-2">
+              {contributions.map(c => {
+                const maxPts = Math.max(...contributions.map(x => x.rawPoints), 1);
+                const heightPct = c.rawPoints > 0 ? Math.max((c.rawPoints / maxPts) * 100, 8) : 0;
+                return (
+                  <div key={c.severity} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                    {c.rawPoints > 0 && (
+                      <span className={`text-[10px] font-mono font-bold ${c.color}`}>{c.rawPoints}</span>
+                    )}
+                    <div
+                      className={`w-full rounded-t-md transition-all duration-700 ${c.rawPoints > 0 ? c.bgColor + ' opacity-80' : 'bg-secondary'}`}
+                      style={{ height: c.rawPoints > 0 ? `${heightPct}%` : '4px' }}
+                    />
+                    <span className={`text-[9px] font-medium ${c.rawPoints > 0 ? c.color : 'text-muted-foreground/50'}`}>
+                      {c.label.slice(0, 4)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
