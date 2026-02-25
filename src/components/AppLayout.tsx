@@ -2,6 +2,8 @@ import { BarChart3, Clock, GitCompareArrows, Shield, LogOut } from "lucide-react
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import threatLensLogo from "@/assets/threatlens-logo.png";
 
 const navItems = [
@@ -44,15 +46,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </nav>
             {session && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={signOut}
-                className="ml-2 text-muted-foreground hover:text-foreground gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign out</span>
-              </Button>
+              <div className="flex items-center gap-1 ml-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                      <Avatar className="h-7 w-7 cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all">
+                        <AvatarImage src={session.user.user_metadata?.avatar_url} alt="User" />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                          {(session.user.email?.[0] || "U").toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-auto p-3 space-y-2">
+                    <div className="text-xs font-medium text-foreground">{session.user.user_metadata?.full_name || "User"}</div>
+                    <div className="text-[11px] text-muted-foreground">{session.user.email}</div>
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={signOut}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             )}
           </div>
         </div>
