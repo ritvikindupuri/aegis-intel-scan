@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Shield, Loader2, UserPlus, LogIn } from "lucide-react";
+import { Shield, Loader2, UserPlus, LogIn, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import threatLensLogo from "@/assets/threatlens-logo.png";
@@ -15,18 +17,18 @@ const Auth = () => {
   const [mode, setMode] = useState<AuthMode>("signin");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Listen for auth state changes first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         await handlePostAuth(session);
       }
     });
 
-    // Then check existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         await handlePostAuth(session);
@@ -38,7 +40,6 @@ const Auth = () => {
   }, []);
 
   const handlePostAuth = async (session: any) => {
-    // Check if user has a profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('id')
@@ -48,16 +49,14 @@ const Auth = () => {
     if (profile) {
       navigate("/", { replace: true });
     } else {
-      // Auto-create profile for any authenticated user
       const { error } = await supabase.from('profiles').insert({
         user_id: session.user.id,
         email: session.user.email,
-        display_name: session.user.user_metadata?.full_name || session.user.email,
+        display_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
         avatar_url: session.user.user_metadata?.avatar_url || null,
       });
 
       if (error) {
-        // Profile might already exist (race condition) — try navigating anyway
         const { data: retryProfile } = await supabase
           .from('profiles')
           .select('id')
@@ -76,7 +75,7 @@ const Auth = () => {
     }
   };
 
-  const handleGoogle = async (authMode: AuthMode) => {
+  const handleGoogle = async () => {
     setLoading(true);
     try {
       const isCustomDomain =
@@ -84,7 +83,6 @@ const Auth = () => {
         !window.location.hostname.includes("lovableproject.com");
 
       if (isCustomDomain) {
-        // On custom domains (Netlify), bypass auth-bridge and redirect manually
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
@@ -98,7 +96,6 @@ const Auth = () => {
           return;
         }
       } else {
-        // On Lovable domains, use managed auth-bridge
         const { error } = await lovable.auth.signInWithOAuth("google", {
           redirect_uri: `${window.location.origin}/auth`,
         });
@@ -106,6 +103,43 @@ const Auth = () => {
       }
     } catch (err: any) {
       toast({ title: "Authentication failed", description: err.message, variant: "destructive" });
+      setLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast({ title: "Missing fields", description: "Please enter email and password.", variant: "destructive" });
+      return;
+    }
+    if (password.length < 6) {
+      toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin,
+          },
+        });
+        if (error) throw error;
+        toast({
+          title: "Check your email",
+          description: "We sent you a confirmation link. Please verify your email to continue.",
+        });
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err: any) {
+      toast({ title: "Authentication failed", description: err.message, variant: "destructive" });
+    } finally {
       setLoading(false);
     }
   };
@@ -177,8 +211,9 @@ const Auth = () => {
                   : "Create a new ThreatLens account to get started"}
               </p>
 
+              {/* Google OAuth */}
               <Button
-                onClick={() => handleGoogle(mode)}
+                onClick={handleGoogle}
                 disabled={loading}
                 className="w-full gap-2 h-11"
                 variant="outline"
@@ -193,12 +228,55 @@ const Auth = () => {
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
                 )}
-                {loading
-                  ? "Processing..."
-                  : mode === "signin"
-                    ? "Sign in with Google"
-                    : "Sign up with Google"}
+                {mode === "signin" ? "Sign in with Google" : "Sign up with Google"}
               </Button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              {/* Email/Password Form */}
+              <form onSubmit={handleEmailAuth} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                    className="h-10"
+                  />
+                </div>
+                <Button type="submit" disabled={loading} className="w-full gap-2 h-11">
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mail className="h-4 w-4" />
+                  )}
+                  {loading
+                    ? "Processing..."
+                    : mode === "signin"
+                      ? "Sign in with Email"
+                      : "Sign up with Email"}
+                </Button>
+              </form>
             </div>
 
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground pt-1">
