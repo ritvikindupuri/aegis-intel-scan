@@ -59,6 +59,7 @@ export type Database = {
           policy_type: string
           reason: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           ai_evaluated?: boolean
@@ -68,6 +69,7 @@ export type Database = {
           policy_type?: string
           reason?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           ai_evaluated?: boolean
@@ -77,6 +79,7 @@ export type Database = {
           policy_type?: string
           reason?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -155,6 +158,7 @@ export type Database = {
           domain: string
           id: string
           reason: string | null
+          user_id: string | null
         }
         Insert: {
           action: string
@@ -162,6 +166,7 @@ export type Database = {
           domain: string
           id?: string
           reason?: string | null
+          user_id?: string | null
         }
         Update: {
           action?: string
@@ -169,6 +174,7 @@ export type Database = {
           domain?: string
           id?: string
           reason?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -264,6 +270,7 @@ export type Database = {
           technologies: Json | null
           updated_at: string
           urls_found: number | null
+          user_id: string | null
           vulnerabilities_found: number | null
         }
         Insert: {
@@ -280,6 +287,7 @@ export type Database = {
           technologies?: Json | null
           updated_at?: string
           urls_found?: number | null
+          user_id?: string | null
           vulnerabilities_found?: number | null
         }
         Update: {
@@ -296,6 +304,7 @@ export type Database = {
           technologies?: Json | null
           updated_at?: string
           urls_found?: number | null
+          user_id?: string | null
           vulnerabilities_found?: number | null
         }
         Relationships: []
