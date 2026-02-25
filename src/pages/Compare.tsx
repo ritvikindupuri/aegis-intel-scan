@@ -425,35 +425,36 @@ const Compare = () => {
                 {severityA && severityB && (
                   <>
                     <Separator className="my-4" />
-                    <div className="space-y-2">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Severity Breakdown</p>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Severity Breakdown</p>
+                        <p className="text-[10px] text-muted-foreground/70">How many findings per severity level changed between scans.</p>
+                      </div>
+                      {/* Column headers */}
+                      <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground/50 px-1">
+                        <div className="w-16" />
+                        <div className="w-16 text-center">Scan A</div>
+                        <div className="flex-1" />
+                        <div className="w-16 text-center">Scan B</div>
+                        <div className="w-16 text-right">Change</div>
+                      </div>
                       {severityOrder.map(sev => {
                         const a = severityA[sev];
                         const b = severityB[sev];
                         const delta = b - a;
-                        const maxVal = Math.max(a, b, 1);
                         return (
-                          <div key={sev} className="flex items-center gap-3">
+                          <div key={sev} className="flex items-center gap-3 py-1.5 px-1 rounded-md hover:bg-secondary/30 transition-colors">
                             <div className="w-16">
                               <SeverityBadge severity={sev} />
                             </div>
-                            <div className="flex-1 flex items-center gap-2">
-                              <span className="text-xs font-mono w-6 text-right text-muted-foreground">{a}</span>
-                              <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-                                <div className="h-full bg-muted-foreground/30 rounded-full" style={{ width: `${(a / maxVal) * 100}%` }} />
-                              </div>
+                            <div className="w-16 text-center text-sm font-mono font-bold text-muted-foreground">{a}</div>
+                            <div className="flex-1 flex items-center justify-center">
                               <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
-                              <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${
-                                  sev === "critical" ? "bg-severity-critical" :
-                                  sev === "high" ? "bg-severity-high" :
-                                  sev === "medium" ? "bg-severity-medium" :
-                                  sev === "low" ? "bg-severity-low" : "bg-severity-info"
-                                }`} style={{ width: `${(b / maxVal) * 100}%` }} />
-                              </div>
-                              <span className="text-xs font-mono w-6 text-muted-foreground">{b}</span>
                             </div>
-                            <div className="w-12">
+                            <div className={`w-16 text-center text-sm font-mono font-bold ${
+                              delta > 0 ? "text-severity-critical" : delta < 0 ? "text-success" : "text-foreground"
+                            }`}>{b}</div>
+                            <div className="w-16 text-right">
                               <DeltaIndicator value={delta} />
                             </div>
                           </div>
