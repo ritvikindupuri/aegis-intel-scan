@@ -874,7 +874,7 @@ For organizations scanning the same domain periodically, the Compare page enable
 <p align="center">
   <img src="https://i.imgur.com/5ZJoqK6.png" alt="Scan Comparison — Finding Delta & AI Analyst" width="900" />
 </p>
-<p align="center"><em>Figure 7 — Scan Comparison — Technology & endpoint changes, and AI Threat Analyst chatbot with MITRE ATT&CK / CWE references</em></p>
+<p align="center"><em>Figure 7 — Scan Comparison — Technology stack changes, new/removed endpoint lists, and AI Threat Analyst chatbot demonstrating domain mismatch detection, MITRE ATT&CK / CWE references, and principal remediation recommendations</em></p>
 
 
 #### `Policies.tsx` — Domain Policy Management
