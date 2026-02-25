@@ -86,44 +86,18 @@ const Auth = () => {
     setLoading(true);
     localStorage.setItem('auth_intent', authMode);
     try {
-      const isCustomDomain =
-        !window.location.hostname.includes("lovable.app") &&
-        !window.location.hostname.includes("lovableproject.com");
-
-      if (isCustomDomain) {
-        // Bypass auth-bridge for custom domains (Netlify, etc.)
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: `${window.location.origin}/auth`,
-            skipBrowserRedirect: true,
-          },
-        });
-        if (error) throw error;
-        if (data?.url) {
-          const oauthUrl = new URL(data.url);
-          const authHost = new URL(import.meta.env.VITE_SUPABASE_URL).hostname;
-          const allowedHosts = new Set([authHost, "accounts.google.com"]);
-
-          if (!["http:", "https:"].includes(oauthUrl.protocol) || !allowedHosts.has(oauthUrl.hostname)) {
-            throw new Error("Invalid OAuth redirect URL");
-          }
-
-          window.location.href = data.url;
-          return;
-        }
-      } else {
-        const { error } = await lovable.auth.signInWithOAuth("google", {
-          redirect_uri: window.location.origin,
-        });
-        if (error) {
-          toast({ title: "Authentication failed", description: error.message, variant: "destructive" });
-        }
+      const { error } = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (error) {
+        toast({ title: "Authentication failed", description: error.message, variant: "destructive" });
+        setLoading(false);
+        localStorage.removeItem('auth_intent');
       }
     } catch (err: any) {
       toast({ title: "Authentication failed", description: err.message, variant: "destructive" });
-    } finally {
       setLoading(false);
+      localStorage.removeItem('auth_intent');
     }
   };
 
