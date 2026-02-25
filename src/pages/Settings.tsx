@@ -17,6 +17,23 @@ import {
   Calendar, Key, Plus, Trash2, Copy, Clock, Globe, Shield, Loader2,
 } from "lucide-react";
 
+const ApiExample = ({ label, code, onCopy }: { label: string; code: string; onCopy: (t: string) => void }) => (
+  <div className="mb-3">
+    <p className="text-xs text-muted-foreground mb-1">{label}</p>
+    <div className="relative group">
+      <pre className="text-xs font-mono bg-background/60 border border-border/50 rounded-md p-3 overflow-x-auto whitespace-pre-wrap break-all">{code}</pre>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-1.5 right-1.5 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={() => onCopy(code)}
+      >
+        <Copy className="h-3 w-3" />
+      </Button>
+    </div>
+  </div>
+);
+
 const Settings = () => {
   const { toast } = useToast();
 
@@ -219,17 +236,47 @@ const Settings = () => {
           </TabsContent>
 
           <TabsContent value="api-keys" className="space-y-4 mt-4">
-            {/* API docs preview */}
-            <Card className="p-4 bg-secondary/30 border-dashed">
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                <Shield className="h-4 w-4" /> REST API Reference
+            {/* About section */}
+            <Card className="p-5 bg-secondary/20 border-dashed">
+              <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                <Shield className="h-4 w-4 text-primary" /> Programmatic API Access
               </h3>
-              <div className="text-xs text-muted-foreground space-y-1 font-mono">
-                <p><span className="text-emerald-400">POST</span> /api-gateway — Start scan: {`{"domain": "example.com"}`}</p>
-                <p><span className="text-blue-400">GET</span> /api-gateway/scan/:id — Get scan details</p>
-                <p><span className="text-blue-400">GET</span> /api-gateway/scan/:id/findings — Get findings</p>
-                <p><span className="text-blue-400">GET</span> /api-gateway/scans — List recent scans</p>
-                <p className="text-muted-foreground/60 mt-2">Header: x-api-key: tl_your_key_here</p>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                The ThreatLens REST API lets you integrate security scanning into your existing workflows —
+                CI/CD pipelines, automation scripts, SIEMs, or custom dashboards. Generate an API key below,
+                then use it to trigger scans, retrieve results, and pull findings without ever opening the web UI.
+                All requests are authenticated via the <code className="text-foreground/80 bg-secondary px-1 py-0.5 rounded">x-api-key</code> header.
+              </p>
+
+              <h4 className="text-xs font-semibold text-foreground/80 mb-2">Available Endpoints</h4>
+              <div className="text-xs text-muted-foreground space-y-1.5 font-mono mb-4">
+                <p><span className="text-emerald-400 font-semibold">POST</span> /api-gateway — Start a new scan for a domain</p>
+                <p><span className="text-blue-400 font-semibold">GET</span>&nbsp; /api-gateway/scan/:id — Retrieve scan details (status, risk score, technologies)</p>
+                <p><span className="text-blue-400 font-semibold">GET</span>&nbsp; /api-gateway/scan/:id/findings — List all findings for a scan (CVEs, misconfigs, etc.)</p>
+                <p><span className="text-blue-400 font-semibold">GET</span>&nbsp; /api-gateway/scans — List your recent scans (supports <code className="text-foreground/60">?limit=</code> query param)</p>
+              </div>
+
+              <h4 className="text-xs font-semibold text-foreground/80 mb-2">Example Usage</h4>
+              <ApiExample
+                label="1. Start a scan:"
+                code={`curl -X POST https://vlyjdhbblbqeqrdaxglc.supabase.co/functions/v1/api-gateway/scan \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: tl_your_key_here" \\\n  -d '${JSON.stringify({ domain: "example.com" })}'`}
+                onCopy={copyToClipboard}
+              />
+              <ApiExample
+                label="2. Get scan results:"
+                code={`curl -H "x-api-key: tl_your_key_here" \\\n  https://vlyjdhbblbqeqrdaxglc.supabase.co/functions/v1/api-gateway/scan/SCAN_ID_HERE`}
+                onCopy={copyToClipboard}
+              />
+              <ApiExample
+                label="3. Fetch findings (CVEs, misconfigurations):"
+                code={`curl -H "x-api-key: tl_your_key_here" \\\n  https://vlyjdhbblbqeqrdaxglc.supabase.co/functions/v1/api-gateway/scan/SCAN_ID_HERE/findings`}
+                onCopy={copyToClipboard}
+              />
+
+              <div className="mt-4 p-3 rounded-md bg-primary/5 border border-primary/10">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-primary">Permissions:</span> Each key is granted <code className="bg-secondary px-1 py-0.5 rounded text-foreground/70">scan:create</code>, <code className="bg-secondary px-1 py-0.5 rounded text-foreground/70">scan:read</code>, and <code className="bg-secondary px-1 py-0.5 rounded text-foreground/70">findings:read</code> by default. Keys are hashed with SHA-256 — we never store the raw key.
+                </p>
               </div>
             </Card>
 
