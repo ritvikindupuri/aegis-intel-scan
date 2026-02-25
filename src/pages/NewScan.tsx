@@ -5,7 +5,7 @@ const NewScan = () => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-16">
       <div className="flex flex-col items-center gap-4 text-center">
-        <img src={spectraLogo} alt="Spectra" className="h-12 w-12 rounded-xl" />
+        <img src={spectraLogo} alt="ThreatLens" className="h-12 w-12 rounded-xl" />
         <h1 className="text-2xl font-bold">New Reconnaissance Scan</h1>
         <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
           Enter a target domain or URL to perform automated attack surface mapping and threat intelligence analysis.
