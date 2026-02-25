@@ -1,4 +1,4 @@
-import { Search, BarChart3, Clock, GitCompareArrows } from "lucide-react";
+import { Search, BarChart3, Clock, GitCompareArrows, Shield } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import threatLensLogo from "@/assets/threatlens-logo.png";
 
@@ -7,6 +7,7 @@ const navItems = [
   { to: "/scan", icon: Search, label: "New Scan" },
   { to: "/history", icon: Clock, label: "History" },
   { to: "/compare", icon: GitCompareArrows, label: "Compare" },
+  { to: "/policies", icon: Shield, label: "Policies" },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
