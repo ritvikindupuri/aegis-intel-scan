@@ -175,6 +175,7 @@ Answer the analyst's question directly. Be precise about what the data shows vs.
       },
       body: JSON.stringify({
         model: 'google/gemini-3-flash-preview',
+        temperature: 0,
         messages: [
           { role: 'system', content: 'You are a Principal Cybersecurity Analyst specializing in web application security, penetration testing, and threat intelligence. Provide precise, actionable analysis. Reference OWASP, CWE, and MITRE ATT&CK where relevant. Be concise but thorough.' },
           { role: 'user', content: prompt },
