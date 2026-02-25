@@ -182,7 +182,7 @@ The platform features an AI domain policy agent that prevents misuse by automati
 | **Backend** | Lovable Cloud (Supabase), Deno Edge Functions |
 | **Database** | PostgreSQL with Row Level Security |
 | **Auth** | Google OAuth (Lovable Cloud managed) |
-| **AI Models** | Google Gemini 2.5 Flash, Gemini 2.5 Flash Lite |
+| **AI Models** | Google Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite |
 | **Web Scraping** | Firecrawl API (scrape + map endpoints) |
 | **PDF Export** | jsPDF |
 | **Charts** | Recharts |
