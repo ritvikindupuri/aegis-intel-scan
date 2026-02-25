@@ -2,18 +2,47 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { PageTransition } from "@/components/PageTransition";
+import { AuthProvider, useAuth } from "@/components/AuthProvider";
 import Index from "./pages/Index";
-import NewScan from "./pages/NewScan";
 import ScanDetail from "./pages/ScanDetail";
 import History from "./pages/History";
 import Compare from "./pages/Compare";
 import Policies from "./pages/Policies";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { session, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  if (!session) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+}
+
+const AppRoutes = () => {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  }
+
+  return (
+    <Routes>
+      <Route path="/auth" element={session ? <Navigate to="/" replace /> : <Auth />} />
+      <Route path="/" element={<ProtectedRoute><AppLayout><PageTransition><Index /></PageTransition></AppLayout></ProtectedRoute>} />
+      <Route path="/scan/:id" element={<ProtectedRoute><AppLayout><PageTransition><ScanDetail /></PageTransition></AppLayout></ProtectedRoute>} />
+      <Route path="/history" element={<ProtectedRoute><AppLayout><PageTransition><History /></PageTransition></AppLayout></ProtectedRoute>} />
+      <Route path="/compare" element={<ProtectedRoute><AppLayout><PageTransition><Compare /></PageTransition></AppLayout></ProtectedRoute>} />
+      <Route path="/policies" element={<ProtectedRoute><AppLayout><PageTransition><Policies /></PageTransition></AppLayout></ProtectedRoute>} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -21,19 +50,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppLayout>
-          <PageTransition>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/scan" element={<NewScan />} />
-              <Route path="/scan/:id" element={<ScanDetail />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/compare" element={<Compare />} />
-              <Route path="/policies" element={<Policies />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </PageTransition>
-        </AppLayout>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
