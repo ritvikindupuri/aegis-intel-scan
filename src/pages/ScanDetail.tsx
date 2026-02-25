@@ -406,14 +406,17 @@ const ScanDetail = () => {
                 <TooltipProvider delayDuration={200}>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {[
-                      { label: "Endpoints", value: (parsed.endpoints || parsed.urls || []).length, icon: Link2, desc: "Discovered paths", tip: "All unique URL paths found by crawling the target. Includes pages, API routes, and asset paths. A larger number means a wider attack surface for an adversary to probe." },
-                      { label: "JS Files", value: (parsed.jsFiles || []).length, icon: FileCode, desc: "Client-side scripts", tip: "JavaScript files loaded via <script> tags. These can reveal API keys, internal endpoints, authentication logic, and client-side business rules to attackers." },
-                      { label: "Forms", value: (parsed.forms || []).length, icon: FormInput, desc: "Input vectors", tip: "HTML forms discovered on the target. Each form is a potential injection point for XSS, SQL injection, CSRF, and other input-based attacks." },
-                      { label: "External Deps", value: (parsed.externalDependencies || []).length, icon: ExternalLink, desc: "Third-party resources", tip: "External scripts, stylesheets, and resources loaded from third-party domains. Each dependency is a supply chain risk — a compromised CDN could inject malicious code." },
-                    ].map(({ label, value, icon: Icon, desc, tip }) => (
+                      { label: "Endpoints", value: (parsed.endpoints || parsed.urls || []).length, icon: Link2, desc: "Discovered paths", tip: "All unique URL paths found by crawling the target. Includes pages, API routes, and asset paths. A larger number means a wider attack surface for an adversary to probe.", anchor: "detail-endpoints" },
+                      { label: "JS Files", value: (parsed.jsFiles || []).length, icon: FileCode, desc: "Client-side scripts", tip: "JavaScript files loaded via <script> tags. These can reveal API keys, internal endpoints, authentication logic, and client-side business rules to attackers.", anchor: "detail-jsfiles" },
+                      { label: "Forms", value: (parsed.forms || []).length, icon: FormInput, desc: "Input vectors", tip: "HTML forms discovered on the target. Each form is a potential injection point for XSS, SQL injection, CSRF, and other input-based attacks.", anchor: "detail-forms" },
+                      { label: "External Deps", value: (parsed.externalDependencies || []).length, icon: ExternalLink, desc: "Third-party resources", tip: "External scripts, stylesheets, and resources loaded from third-party domains. Each dependency is a supply chain risk — a compromised CDN could inject malicious code.", anchor: "detail-externaldeps" },
+                    ].map(({ label, value, icon: Icon, desc, tip, anchor }) => (
                       <Tooltip key={label}>
                         <TooltipTrigger asChild>
-                          <Card className="bg-card border-border cursor-help">
+                          <Card
+                            className="bg-card border-border cursor-pointer hover:border-primary/40 transition-colors"
+                            onClick={() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                          >
                             <CardContent className="p-3 flex items-center gap-3">
                               <div className="p-2 rounded-lg bg-secondary">
                                 <Icon className="h-4 w-4 text-muted-foreground" />
@@ -494,7 +497,7 @@ const ScanDetail = () => {
                 )}
 
                 {/* Discovered URLs */}
-                <Card className="bg-card border-border">
+                <Card id="detail-endpoints" className="bg-card border-border scroll-mt-4">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
                       <Link2 className="h-3.5 w-3.5 text-primary" /> Discovered Endpoints ({(parsed.endpoints || parsed.urls || []).length})
@@ -516,7 +519,7 @@ const ScanDetail = () => {
                 {/* JS Files & Forms side by side */}
                 <div className="grid md:grid-cols-2 gap-4">
                   {(parsed.jsFiles || []).length > 0 && (
-                    <Card className="bg-card border-border">
+                    <Card id="detail-jsfiles" className="bg-card border-border scroll-mt-4">
                       <CardHeader className="pb-3">
                         <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
                           <FileCode className="h-3.5 w-3.5 text-primary" /> JavaScript Files ({(parsed.jsFiles || []).length})
@@ -534,7 +537,7 @@ const ScanDetail = () => {
                   )}
 
                   {(parsed.forms || []).length > 0 && (
-                    <Card className="bg-card border-border">
+                    <Card id="detail-forms" className="bg-card border-border scroll-mt-4">
                       <CardHeader className="pb-3">
                         <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
                           <FormInput className="h-3.5 w-3.5 text-primary" /> Input Vectors ({(parsed.forms || []).length})
@@ -565,7 +568,7 @@ const ScanDetail = () => {
 
                 {/* External Dependencies */}
                 {(parsed.externalDependencies || []).length > 0 && (
-                  <Card className="bg-card border-border">
+                  <Card id="detail-externaldeps" className="bg-card border-border scroll-mt-4">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
                         <ExternalLink className="h-3.5 w-3.5 text-primary" /> External Dependencies ({(parsed.externalDependencies || []).length})
