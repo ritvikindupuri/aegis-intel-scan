@@ -261,99 +261,173 @@ const ScanDetail = () => {
 
               {/* Attack Surface Tab */}
               <TabsContent value="surface" className="space-y-4">
+                {/* Surface overview stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { label: "Endpoints", value: (parsed.endpoints || parsed.urls || []).length, icon: Link2, desc: "Discovered paths" },
+                    { label: "JS Files", value: (parsed.jsFiles || []).length, icon: FileCode, desc: "Client-side scripts" },
+                    { label: "Forms", value: (parsed.forms || []).length, icon: FormInput, desc: "Input vectors" },
+                    { label: "External Deps", value: (parsed.externalDependencies || []).length, icon: ExternalLink, desc: "Third-party resources" },
+                  ].map(({ label, value, icon: Icon, desc }) => (
+                    <Card key={label} className="bg-card border-border">
+                      <CardContent className="p-3 flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-secondary">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-mono font-bold">{value}</div>
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{desc}</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Technologies with categories */}
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Cpu className="h-4 w-4" /> Technologies
+                    <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                      <Cpu className="h-3.5 w-3.5 text-primary" /> Technology Stack
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {(scan.technologies || []).map((t: string) => (
-                        <span key={t} className="px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">{t}</span>
-                      ))}
-                      {(scan.technologies || []).length === 0 && <span className="text-xs text-muted-foreground">None detected</span>}
-                    </div>
+                    {(scan.technologies || []).length === 0 ? (
+                      <span className="text-xs text-muted-foreground">None detected</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(scan.technologies || []).map((t: string) => (
+                          <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-mono border border-primary/20">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                      Technologies are fingerprinted from response headers, meta tags, JavaScript libraries, and HTML patterns. Known CVEs for detected versions should be cross-referenced.
+                    </p>
                   </CardContent>
                 </Card>
 
+                {/* Security Headers - enhanced */}
                 {parsed.securityHeaders && (
                   <Card className="bg-card border-border">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Shield className="h-4 w-4" /> Security Headers
+                      <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                        <Shield className="h-3.5 w-3.5 text-primary" /> Security Headers
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        {Object.entries(parsed.securityHeaders).map(([header, value]) => (
-                          <div key={header} className="flex items-center justify-between text-sm">
-                            <span className="font-mono text-xs">{header}</span>
-                            <span className={`text-xs font-mono ${value === 'Not Set' ? 'text-severity-high' : 'text-success'}`}>
-                              {value as string}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="space-y-1">
+                        {Object.entries(parsed.securityHeaders).map(([header, value]) => {
+                          const isSet = value !== 'Not Set';
+                          return (
+                            <div key={header} className={`flex items-center justify-between text-sm py-1.5 px-3 rounded-md ${isSet ? 'bg-success/5' : 'bg-destructive/5'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className={`h-1.5 w-1.5 rounded-full ${isSet ? 'bg-success' : 'bg-destructive'}`} />
+                                <span className="font-mono text-xs">{header}</span>
+                              </div>
+                              <span className={`text-xs font-mono ${isSet ? 'text-success' : 'text-destructive'}`}>
+                                {isSet ? (value as string).substring(0, 40) + ((value as string).length > 40 ? '…' : '') : 'Missing'}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
+                      <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                        Missing security headers expose the application to clickjacking, XSS, MIME sniffing, and protocol downgrade attacks.
+                      </p>
                     </CardContent>
                   </Card>
                 )}
 
+                {/* Discovered URLs */}
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Link2 className="h-4 w-4" /> Discovered URLs ({(parsed.urls || []).length})
+                    <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                      <Link2 className="h-3.5 w-3.5 text-primary" /> Discovered Endpoints ({(parsed.urls || []).length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="max-h-60 overflow-y-auto space-y-1">
+                    <div className="max-h-48 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
                       {(parsed.urls || []).slice(0, 50).map((url: string, i: number) => (
-                        <div key={i} className="text-xs font-mono text-muted-foreground truncate hover:text-foreground transition-colors flex items-center gap-1">
-                          <ExternalLink className="h-3 w-3 shrink-0" />
+                        <div key={i} className="text-xs font-mono text-muted-foreground truncate hover:text-foreground transition-colors py-0.5 px-2 rounded hover:bg-secondary/60 flex items-center gap-1.5">
+                          <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-50" />
                           {url}
                         </div>
                       ))}
                       {(parsed.urls || []).length > 50 && (
-                        <div className="text-xs text-muted-foreground pt-2">...and {(parsed.urls || []).length - 50} more</div>
+                        <div className="text-[11px] text-muted-foreground pt-2 px-2">+ {(parsed.urls || []).length - 50} additional endpoints</div>
                       )}
                     </div>
+                    {(parsed.urls || []).length === 0 && <span className="text-xs text-muted-foreground">No endpoints discovered</span>}
                   </CardContent>
                 </Card>
 
-                {(parsed.jsFiles || []).length > 0 && (
-                  <Card className="bg-card border-border">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <FileCode className="h-4 w-4" /> JavaScript Files ({(parsed.jsFiles || []).length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="max-h-40 overflow-y-auto space-y-1">
-                        {(parsed.jsFiles || []).map((f: string, i: number) => (
-                          <div key={i} className="text-xs font-mono text-muted-foreground truncate">{f}</div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                {/* JS Files & Forms side by side */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  {(parsed.jsFiles || []).length > 0 && (
+                    <Card className="bg-card border-border">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                          <FileCode className="h-3.5 w-3.5 text-primary" /> JavaScript Files ({(parsed.jsFiles || []).length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="max-h-40 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
+                          {(parsed.jsFiles || []).map((f: string, i: number) => (
+                            <div key={i} className="text-xs font-mono text-muted-foreground truncate py-0.5 px-2 hover:text-foreground rounded hover:bg-secondary/60">{f}</div>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-2">Client-side scripts may expose API keys, internal routes, or debug endpoints.</p>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                {(parsed.forms || []).length > 0 && (
+                  {(parsed.forms || []).length > 0 && (
+                    <Card className="bg-card border-border">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                          <FormInput className="h-3.5 w-3.5 text-primary" /> Input Vectors ({(parsed.forms || []).length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {(parsed.forms || []).map((form: any, i: number) => (
+                            <div key={i} className="p-2.5 rounded-lg bg-secondary/40 border border-border text-xs font-mono space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-[10px] uppercase">Action</span>
+                                <span className="text-foreground">{form.action || '(self)'}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${form.method?.toUpperCase() === 'POST' ? 'bg-accent/20 text-accent' : 'bg-primary/20 text-primary'}`}>
+                                  {form.method || 'GET'}
+                                </span>
+                                <span className="text-muted-foreground">{form.inputs?.join(', ')}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-2">Forms are potential injection points for XSS, SQLi, and CSRF attacks.</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* External Dependencies */}
+                {(parsed.externalDependencies || []).length > 0 && (
                   <Card className="bg-card border-border">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <FormInput className="h-4 w-4" /> Forms ({(parsed.forms || []).length})
+                      <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                        <ExternalLink className="h-3.5 w-3.5 text-primary" /> External Dependencies ({(parsed.externalDependencies || []).length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
-                        {(parsed.forms || []).map((form: any, i: number) => (
-                          <div key={i} className="p-3 rounded bg-secondary text-xs font-mono">
-                            <div><span className="text-muted-foreground">Action:</span> {form.action || '(none)'}</div>
-                            <div><span className="text-muted-foreground">Method:</span> {form.method}</div>
-                            <div><span className="text-muted-foreground">Inputs:</span> {form.inputs.join(', ')}</div>
-                          </div>
+                      <div className="max-h-40 overflow-y-auto space-y-0.5 rounded-lg bg-secondary/30 p-2">
+                        {(parsed.externalDependencies || []).slice(0, 30).map((dep: string, i: number) => (
+                          <div key={i} className="text-xs font-mono text-muted-foreground truncate py-0.5 px-2 hover:text-foreground rounded hover:bg-secondary/60">{dep}</div>
                         ))}
                       </div>
+                      <p className="text-[11px] text-muted-foreground mt-2">Third-party dependencies increase supply chain attack surface. Verify integrity with SRI hashes.</p>
                     </CardContent>
                   </Card>
                 )}
