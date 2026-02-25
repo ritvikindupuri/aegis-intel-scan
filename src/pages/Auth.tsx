@@ -87,7 +87,7 @@ const Auth = () => {
     localStorage.setItem('auth_intent', authMode);
     try {
       const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/auth`,
       });
       if (error) {
         toast({ title: "Authentication failed", description: error.message, variant: "destructive" });
