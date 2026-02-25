@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import type { Scan, Finding } from "@/lib/api";
 
-export function exportReportAsPdf(scan: Scan, findings: Finding[]) {
+export function exportReportAsPdf(scan: Scan, findings: Finding[], surfaceInsights?: Record<string, string>) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -251,6 +251,94 @@ export function exportReportAsPdf(scan: Scan, findings: Finding[]) {
         doc.text(wrapped, margin, y);
         y += wrapped.length * 4 + 1;
       }
+    }
+  }
+
+  // === AI SURFACE INSIGHTS PAGES ===
+  if (surfaceInsights && Object.keys(surfaceInsights).length > 0) {
+    addPage();
+
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30);
+    doc.text("AI Attack Surface Analysis", margin, y);
+    y += 12;
+
+    const sectionTitles: Record<string, string> = {
+      security_headers: "Security Headers Analysis",
+      endpoints: "Discovered Endpoints Analysis",
+      dependencies: "External Dependencies Analysis",
+    };
+
+    for (const [section, content] of Object.entries(surfaceInsights)) {
+      checkPageBreak(20);
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(120, 80, 220);
+      doc.text(sectionTitles[section] || section, margin, y);
+      y += 8;
+
+      const lines = content.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("## ")) {
+          checkPageBreak(14);
+          y += 4;
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(30);
+          doc.text(line.replace("## ", ""), margin, y);
+          y += 7;
+        } else if (line.startsWith("### ")) {
+          checkPageBreak(12);
+          y += 2;
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(60);
+          doc.text(line.replace("### ", ""), margin, y);
+          y += 6;
+        } else if (line.startsWith("- ") || line.startsWith("* ")) {
+          checkPageBreak(6);
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(60);
+          const bulletText = "• " + line.replace(/^[-*]\s*/, "").replace(/\*\*/g, "");
+          const wrapped = doc.splitTextToSize(bulletText, contentWidth - 4);
+          checkPageBreak(wrapped.length * 4);
+          doc.text(wrapped, margin + 4, y);
+          y += wrapped.length * 4 + 1;
+        } else if (line.startsWith("**")) {
+          checkPageBreak(6);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(40);
+          const boldText = line.replace(/\*\*/g, "");
+          const wrapped = doc.splitTextToSize(boldText, contentWidth);
+          doc.text(wrapped, margin, y);
+          y += wrapped.length * 4 + 2;
+        } else if (line.trim() === "") {
+          y += 3;
+        } else if (line.startsWith("---")) {
+          checkPageBreak(8);
+          doc.setDrawColor(200);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 6;
+        } else {
+          checkPageBreak(6);
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(60);
+          const cleanLine = line.replace(/\*\*/g, "");
+          const wrapped = doc.splitTextToSize(cleanLine, contentWidth);
+          checkPageBreak(wrapped.length * 4);
+          doc.text(wrapped, margin, y);
+          y += wrapped.length * 4 + 1;
+        }
+      }
+
+      y += 8;
+      doc.setDrawColor(200);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 8;
     }
   }
 

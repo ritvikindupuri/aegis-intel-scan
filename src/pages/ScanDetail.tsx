@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getScan, getFindings, generateReport, type Scan, type Finding } from "@/lib/api";
 import { SeverityBadge, RiskScoreGauge, StatusBadge } from "@/components/SeverityBadge";
 import { RiskScoreBreakdown } from "@/components/RiskScoreBreakdown";
 import { exportReportAsPdf } from "@/lib/pdf-export";
 import { AiSurfaceInsight } from "@/components/AiSurfaceInsight";
-import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code, Download } from "lucide-react";
+import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code, Download, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -20,7 +21,12 @@ const ScanDetail = () => {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
+  const [surfaceInsights, setSurfaceInsights] = useState<Record<string, string>>({});
   const { toast } = useToast();
+
+  const handleInsightGenerated = useCallback((section: string, analysis: string) => {
+    setSurfaceInsights(prev => ({ ...prev, [section]: analysis }));
+  }, []);
 
   const fetchData = async () => {
     if (!id) return;
@@ -60,7 +66,7 @@ const ScanDetail = () => {
   const handleExportPdf = () => {
     if (!scan) return;
     try {
-      exportReportAsPdf(scan, findings);
+      exportReportAsPdf(scan, findings, surfaceInsights);
       toast({ title: "PDF exported", description: "Report downloaded successfully." });
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
@@ -152,20 +158,32 @@ const ScanDetail = () => {
                 <RiskScoreGauge score={scan.risk_score} />
               </CardContent>
             </Card>
-            {[
-              { label: "URLs Found", value: scan.urls_found, icon: Link2 },
-              { label: "Vulnerabilities", value: scan.vulnerabilities_found, icon: AlertTriangle },
-              { label: "Technologies", value: (scan.technologies || []).length, icon: Cpu },
-              { label: "JS Files", value: (parsed.jsFiles || []).length, icon: FileCode },
-            ].map(({ label, value, icon: Icon }) => (
-              <Card key={label} className="bg-card border-border">
-                <CardContent className="p-4 flex flex-col items-center gap-1">
-                  <Icon className="h-5 w-5 text-muted-foreground" />
-                  <div className="text-2xl font-mono font-bold">{value}</div>
-                  <div className="text-xs text-muted-foreground">{label}</div>
-                </CardContent>
-              </Card>
-            ))}
+            <TooltipProvider delayDuration={200}>
+              {[
+                { label: "URLs Found", value: scan.urls_found, icon: Link2, tip: "Total unique URLs discovered by crawling the target domain. The scanner follows internal links up to a configured depth, collecting every reachable page, API route, and asset URL." },
+                { label: "Vulnerabilities", value: scan.vulnerabilities_found, icon: AlertTriangle, tip: "Count of security findings identified by analyzing crawled data — including missing headers, exposed admin panels, information leaks, outdated libraries, and misconfigurations." },
+                { label: "Technologies", value: (scan.technologies || []).length, icon: Cpu, tip: "Technologies fingerprinted from HTTP response headers, HTML meta tags, JavaScript globals, and known library file patterns (e.g. jQuery, React, WordPress)." },
+                { label: "JS Files", value: (parsed.jsFiles || []).length, icon: FileCode, tip: "JavaScript files extracted from <script src> tags across all crawled pages. These may expose API keys, internal routes, debug endpoints, or client-side business logic." },
+              ].map(({ label, value, icon: Icon, tip }) => (
+                <Card key={label} className="bg-card border-border">
+                  <CardContent className="p-4 flex flex-col items-center gap-1">
+                    <Icon className="h-5 w-5 text-muted-foreground" />
+                    <div className="text-2xl font-mono font-bold">{value}</div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 cursor-help">
+                          {label}
+                          <Info className="h-3 w-3 opacity-50" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[260px] text-xs leading-relaxed">
+                        {tip}
+                      </TooltipContent>
+                    </Tooltip>
+                  </CardContent>
+                </Card>
+              ))}
+            </TooltipProvider>
           </motion.div>
 
           {/* Risk Score Breakdown */}
@@ -337,7 +355,7 @@ const ScanDetail = () => {
                       <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
                         Missing security headers expose the application to clickjacking, XSS, MIME sniffing, and protocol downgrade attacks.
                       </p>
-                      <AiSurfaceInsight section="security_headers" data={parsed.securityHeaders} domain={scan.domain} />
+                      <AiSurfaceInsight section="security_headers" data={parsed.securityHeaders} domain={scan.domain} onAnalysis={handleInsightGenerated} />
                     </CardContent>
                   </Card>
                 )}
@@ -363,7 +381,7 @@ const ScanDetail = () => {
                     </div>
                     {(parsed.urls || []).length === 0 && <span className="text-xs text-muted-foreground">No endpoints discovered</span>}
                     {(parsed.urls || []).length > 0 && (
-                      <AiSurfaceInsight section="endpoints" data={parsed.urls || []} domain={scan.domain} />
+                      <AiSurfaceInsight section="endpoints" data={parsed.urls || []} domain={scan.domain} onAnalysis={handleInsightGenerated} />
                     )}
                   </CardContent>
                 </Card>
@@ -433,7 +451,7 @@ const ScanDetail = () => {
                         ))}
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-2">Third-party dependencies increase supply chain attack surface. Verify integrity with SRI hashes.</p>
-                      <AiSurfaceInsight section="dependencies" data={parsed.externalDependencies || []} domain={scan.domain} />
+                      <AiSurfaceInsight section="dependencies" data={parsed.externalDependencies || []} domain={scan.domain} onAnalysis={handleInsightGenerated} />
                     </CardContent>
                   </Card>
                 )}

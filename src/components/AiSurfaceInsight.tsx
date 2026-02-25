@@ -8,9 +8,10 @@ interface AiSurfaceInsightProps {
   section: "security_headers" | "endpoints" | "dependencies";
   data: any;
   domain: string;
+  onAnalysis?: (section: string, analysis: string) => void;
 }
 
-export function AiSurfaceInsight({ section, data, domain }: AiSurfaceInsightProps) {
+export function AiSurfaceInsight({ section, data, domain, onAnalysis }: AiSurfaceInsightProps) {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -20,6 +21,7 @@ export function AiSurfaceInsight({ section, data, domain }: AiSurfaceInsightProp
     try {
       const result = await analyzeSurface(section, data, domain);
       setAnalysis(result);
+      onAnalysis?.(section, result);
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });
     } finally {
