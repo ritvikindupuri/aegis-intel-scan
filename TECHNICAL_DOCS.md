@@ -752,7 +752,7 @@ Once authenticated, users land on the dashboard — the operational hub that pro
 <p align="center">
   <img src="https://i.imgur.com/PRMxinn.png" alt="ThreatLens Dashboard" width="900" />
 </p>
-<p align="center"><em>Dashboard — Hero section with scan form, stats grid, recent scans, risk distribution, and technology cloud</em></p>
+<p align="center"><em>Figure 1 — Dashboard — Hero section with scan form, stats grid, recent scans, risk distribution, and technology cloud</em></p>
 
 The most complex page in the application — where the bulk of scan intelligence is consumed. Users navigate here after initiating a scan or clicking a scan from the dashboard/history. It's organized into **four tabs** that separate concerns:
 
@@ -776,7 +776,7 @@ The most complex page in the application — where the bulk of scan intelligence
 <p align="center">
   <img src="https://i.imgur.com/ixhNJwz.png" alt="Scan Detail - Findings Tab" width="900" />
 </p>
-<p align="center"><em>Scan Detail — Header stats, severity guide, domain enrichment, and Findings tab with severity-coded finding cards</em></p>
+<p align="center"><em>Figure 2 — Scan Detail — Header stats, severity guide, domain enrichment, and Findings tab with severity-coded finding cards</em></p>
 
 **Tab 2: Attack Surface**
 - Attack Surface Summary table (5 rows: Security Headers, Endpoints, External Deps, JS Files, Input Vectors) with count, status, and risk implication
@@ -791,12 +791,12 @@ The most complex page in the application — where the bulk of scan intelligence
 <p align="center">
   <img src="https://i.imgur.com/9YGmSm4.png" alt="Attack Surface - Summary and AI Chat" width="900" />
 </p>
-<p align="center"><em>Attack Surface tab — Summary table, AI Threat Analyst chat with per-header analysis, and stat cards</em></p>
+<p align="center"><em>Figure 3 — Attack Surface tab — Summary table, AI Threat Analyst chat with per-header analysis, and stat cards</em></p>
 
 <p align="center">
   <img src="https://i.imgur.com/PS0KN01.png" alt="Attack Surface - Security Headers and Endpoints" width="900" />
 </p>
-<p align="center"><em>Attack Surface tab — Technology stack, security headers table (red = missing), and discovered endpoints</em></p>
+<p align="center"><em>Figure 4 — Attack Surface tab — Technology stack, security headers table (red = missing), and discovered endpoints</em></p>
 
 **Tab 3: AI Report**
 - Generate button (if no report exists)
@@ -810,7 +810,7 @@ The most complex page in the application — where the bulk of scan intelligence
 <p align="center">
   <img src="https://i.imgur.com/7imT3Tb.png" alt="Raw Data tab with AI Analyst" width="900" />
 </p>
-<p align="center"><em>Raw Data tab — AI Threat Analyst providing intelligence briefing on raw crawl data, with JSON viewer below</em></p>
+<p align="center"><em>Figure 5 — Raw Data tab — AI Threat Analyst providing intelligence briefing on raw crawl data, with JSON viewer below</em></p>
 
 #### `History.tsx` — Scan History
 While the dashboard shows the 5 most recent scans, the History page provides a complete chronological view with management capabilities:
@@ -833,7 +833,7 @@ For organizations scanning the same domain periodically, the Compare page enable
 <p align="center">
   <img src="https://i.imgur.com/iW4XrM2.png" alt="Scan Comparison Page" width="900" />
 </p>
-<p align="center"><em>Scan Comparison — Side-by-side delta analysis showing risk score change, vulnerability diff, technology changes, and endpoint changes</em></p>
+<p align="center"><em>Figure 6 — Scan Comparison — Side-by-side delta analysis showing risk score change, vulnerability diff, technology changes, and endpoint changes</em></p>
 
 #### `Policies.tsx` — Domain Policy Management
 This page is the human override layer on top of the AI policy agent — allowing administrators to manually approve, block, or flag domains, and review the full audit trail:
@@ -851,7 +851,7 @@ This page is the human override layer on top of the AI policy agent — allowing
 <p align="center">
   <img src="https://i.imgur.com/gyo02jq.png" alt="Domain Policies Page" width="900" />
 </p>
-<p align="center"><em>Domain Policies — Stats cards, manual policy form, policy list with AI-evaluated indicators, and immutable audit log</em></p>
+<p align="center"><em>Figure 7 — Domain Policies — Stats cards, manual policy form, policy list with AI-evaluated indicators, and immutable audit log</em></p>
 
 #### `NotFound.tsx` — 404 Page
 - Centered layout with "404" heading, "Page not found" message, and link back to home
