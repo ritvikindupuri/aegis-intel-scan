@@ -43,15 +43,36 @@ const SUGGESTED_QUESTIONS: Record<string, string[]> = {
   ],
 };
 
+function renderInline(text: string) {
+  // Split on **bold** markers and render inline bold spans
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, j) =>
+    j % 2 === 1
+      ? <span key={j} className="font-semibold text-foreground">{part}</span>
+      : <span key={j}>{part}</span>
+  );
+}
+
 function renderMarkdown(text: string) {
   return text.split('\n').map((line, i) => {
-    if (line.startsWith('## ')) return <h3 key={i} className="text-sm font-bold text-foreground mt-3 mb-1">{line.replace('## ', '')}</h3>;
-    if (line.startsWith('### ')) return <h4 key={i} className="text-xs font-bold text-foreground mt-2 mb-0.5">{line.replace('### ', '')}</h4>;
-    if (line.startsWith('**') && line.endsWith('**')) return <div key={i} className="text-xs font-bold text-foreground mt-2">{line.replace(/\*\*/g, '')}</div>;
-    if (line.startsWith('- ') || line.startsWith('* ')) return <div key={i} className="text-xs text-muted-foreground pl-3">• {line.replace(/^[-*]\s*/, '').replace(/\*\*/g, '')}</div>;
-    if (line.match(/^\d+\.\s/)) return <div key={i} className="text-xs text-muted-foreground pl-3">{line.replace(/\*\*/g, '')}</div>;
-    if (line.trim() === '') return <div key={i} className="h-1" />;
-    return <div key={i} className="text-xs text-muted-foreground">{line.replace(/\*\*/g, '')}</div>;
+    if (line.startsWith('## ')) return <h3 key={i} className="text-sm font-bold text-foreground mt-4 mb-1.5">{line.replace('## ', '')}</h3>;
+    if (line.startsWith('### ')) return <h4 key={i} className="text-xs font-bold text-foreground mt-3 mb-1">{line.replace('### ', '')}</h4>;
+    if (line.startsWith('#### ')) return <h5 key={i} className="text-xs font-semibold text-foreground mt-2 mb-0.5">{line.replace('#### ', '')}</h5>;
+    if (line.startsWith('**') && line.endsWith('**')) return <div key={i} className="text-xs font-bold text-foreground mt-3 mb-1">{line.replace(/\*\*/g, '')}</div>;
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      const content = line.replace(/^[-*]\s*/, '');
+      return <div key={i} className="text-xs text-muted-foreground pl-4 py-0.5 flex gap-1.5"><span className="text-primary shrink-0">•</span><span>{renderInline(content)}</span></div>;
+    }
+    if (line.match(/^\s+[-*]\s/)) {
+      const content = line.replace(/^\s+[-*]\s*/, '');
+      return <div key={i} className="text-xs text-muted-foreground pl-8 py-0.5 flex gap-1.5"><span className="text-muted-foreground/50 shrink-0">◦</span><span>{renderInline(content)}</span></div>;
+    }
+    if (line.match(/^\d+\.\s/)) {
+      return <div key={i} className="text-xs text-muted-foreground pl-4 py-0.5">{renderInline(line)}</div>;
+    }
+    if (line.startsWith('---')) return <hr key={i} className="border-border my-2" />;
+    if (line.trim() === '') return <div key={i} className="h-2" />;
+    return <div key={i} className="text-xs text-muted-foreground leading-relaxed">{renderInline(line)}</div>;
   });
 }
 
