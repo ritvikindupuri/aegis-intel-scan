@@ -10,6 +10,7 @@ import NewScan from "./pages/NewScan";
 import ScanDetail from "./pages/ScanDetail";
 import History from "./pages/History";
 import Compare from "./pages/Compare";
+import Policies from "./pages/Policies";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/scan/:id" element={<ScanDetail />} />
               <Route path="/history" element={<History />} />
               <Route path="/compare" element={<Compare />} />
+              <Route path="/policies" element={<Policies />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </PageTransition>

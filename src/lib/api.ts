@@ -28,6 +28,15 @@ export interface Finding {
   created_at: string;
 }
 
+export async function evaluateDomain(domain: string): Promise<{ allowed: boolean; policy: string; reason: string }> {
+  const { data, error } = await supabase.functions.invoke('evaluate-domain', {
+    body: { domain },
+  });
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 export async function startScan(domain: string): Promise<{ scanId: string }> {
   const { data, error } = await supabase.functions.invoke('firecrawl-scan', {
     body: { domain },

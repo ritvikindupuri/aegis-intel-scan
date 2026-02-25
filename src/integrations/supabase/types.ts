@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      domain_policies: {
+        Row: {
+          ai_evaluated: boolean
+          created_at: string
+          domain: string
+          id: string
+          policy_type: string
+          reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_evaluated?: boolean
+          created_at?: string
+          domain: string
+          id?: string
+          policy_type?: string
+          reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_evaluated?: boolean
+          created_at?: string
+          domain?: string
+          id?: string
+          policy_type?: string
+          reason?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       findings: {
         Row: {
           category: string
@@ -54,6 +84,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scan_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          domain: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          domain: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          domain?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
       }
       scans: {
         Row: {
