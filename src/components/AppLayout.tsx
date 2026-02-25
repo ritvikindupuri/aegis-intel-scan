@@ -1,6 +1,6 @@
 import { Search, BarChart3, Clock, GitCompareArrows } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import spectraLogo from "@/assets/spectra-logo.png";
+import threatLensLogo from "@/assets/threatlens-logo.png";
 
 const navItems = [
   { to: "/", icon: BarChart3, label: "Dashboard" },
@@ -17,7 +17,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="border-b border-border glass sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14 px-4">
           <Link to="/" className="flex items-center gap-2.5">
-            <img src={spectraLogo} alt="ThreatLens" className="h-7 w-7 rounded-md" />
+            <img src={threatLensLogo} alt="ThreatLens" className="h-7 w-7 rounded-md" />
             <span className="text-lg font-bold tracking-tight">
               <span className="text-gradient-primary">Threat</span>
               <span className="text-foreground">Lens</span>

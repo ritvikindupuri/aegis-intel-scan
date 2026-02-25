@@ -8,7 +8,7 @@ import { getScans, type Scan } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { fadeInUp, staggerContainer } from "@/components/PageTransition";
-import spectraLogo from "@/assets/spectra-logo.png";
+import threatLensLogo from "@/assets/threatlens-logo.png";
 
 const Dashboard = () => {
   const [scans, setScans] = useState<Scan[]>([]);
@@ -53,15 +53,14 @@ const Dashboard = () => {
 
   return (
     <motion.div className="space-y-8" variants={staggerContainer} initial="initial" animate="animate">
-      {/* Hero */}
       <motion.div variants={fadeInUp} className="flex flex-col items-center text-center gap-5 py-10">
         <motion.img
-          src={spectraLogo}
+          src={threatLensLogo}
           alt="ThreatLens"
           className="h-14 w-14 rounded-xl"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
         />
         <div>
           <h1 className="text-3xl font-bold tracking-tight">

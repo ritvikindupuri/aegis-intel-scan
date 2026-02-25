@@ -1,7 +1,7 @@
 import { ScanForm } from "@/components/ScanForm";
 import { motion } from "framer-motion";
 import { fadeInUp, staggerContainer } from "@/components/PageTransition";
-import spectraLogo from "@/assets/spectra-logo.png";
+import threatLensLogo from "@/assets/threatlens-logo.png";
 
 const NewScan = () => {
   return (
@@ -13,12 +13,12 @@ const NewScan = () => {
     >
       <motion.div variants={fadeInUp} className="flex flex-col items-center gap-4 text-center">
         <motion.img
-          src={spectraLogo}
+          src={threatLensLogo}
           alt="ThreatLens"
           className="h-12 w-12 rounded-xl"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
         />
         <h1 className="text-2xl font-bold">New Reconnaissance Scan</h1>
         <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
