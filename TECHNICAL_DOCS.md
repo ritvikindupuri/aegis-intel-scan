@@ -821,14 +821,40 @@ While the dashboard shows the 5 most recent scans, the History page provides a c
 - Staggered entry animations
 
 #### `Compare.tsx` — Scan Comparison
-For organizations scanning the same domain periodically, the Compare page enables delta analysis between any two completed scans:
-- Dual Select dropdowns (only completed scans)
-- Mutual exclusion (can't compare a scan with itself)
-- Parallel data loading with `Promise.all`
-- **Risk Score Change**: Side-by-side with delta indicator (green for improvement, red for regression)
-- **Vulnerability changes**: 3-column grid — New Vulnerabilities, Resolved, Persistent (diff by finding title)
-- **Technology Changes**: Added (green +), Removed (red −), Unchanged chips
-- **Endpoint Changes**: New Endpoints, Removed Endpoints (capped at 30 shown, with "+N more" overflow)
+For organizations scanning the same domain periodically, the Compare page enables structured delta analysis between any two completed scans. It is designed to give analysts an immediate, actionable view of what changed between scan intervals.
+
+**Scan Selection**:
+- Two Select dropdowns filter to completed scans only, with mutual exclusion (can't compare a scan with itself)
+- Each selector card displays rich metadata once chosen: domain, exact scan timestamp, risk score, finding count, endpoint count, and technology count — so analysts can confirm they've selected the right pair before reviewing the diff
+- Parallel data loading with `Promise.all` fetches both scan records and their findings simultaneously
+
+**Executive Summary** (4-card grid):
+- **Risk Score** — A → B with delta indicator (green = improvement, red = regression)
+- **Findings** — Total vulnerability count with directional delta
+- **Endpoints** — Discovered URL count with inverted delta logic (more = larger attack surface)
+- **Technologies** — Stack size with inverted delta logic
+- Each card includes an info tooltip explaining what the metric means for the analyst
+
+**Risk Score Change** (detailed):
+- Large side-by-side numeric display (color-coded: ≥75 critical, ≥50 high, ≥25 medium, <25 low)
+- Numeric delta with sign and color
+- **Severity Breakdown** — Per-severity bar chart comparison (critical → info), showing A and B counts side-by-side with progress bars and delta indicators. Allows analysts to see whether the risk shift is driven by new critical findings or just informational noise
+
+**Vulnerability Delta** (3-column card):
+- **New** — Findings present in B but not A, shown with severity badge, title, and category, highlighted with a red "Action Required" tag
+- **Resolved** — Findings present in A but not B, shown with strike-through text and green "Improvement" tag
+- **Persistent** — Findings present in both scans, shown with "Unresolved" tag — these represent the backlog
+- Matching logic: findings are diffed by title (exact string match)
+- Each finding card shows both severity badge and category label for faster triage
+
+**Technology Stack Changes**:
+- Grouped into three labeled sections: Added (green + border), Removed (red − border), Unchanged (neutral chips)
+- Contextual description explains that added technologies expand the attack surface while removed ones may indicate decommissioning
+
+**Endpoint Changes** (2-column grid):
+- **New Endpoints** — URLs in B but not A, described as "potential new attack vectors", capped at 30 with "+N more" overflow
+- **Removed Endpoints** — URLs in A but not B, described as "possibly decommissioned services"
+- **Unchanged summary** — Footer line showing how many endpoints are stable between scans
 
 <p align="center">
   <img src="https://i.imgur.com/iW4XrM2.png" alt="Scan Comparison Page" width="900" />
