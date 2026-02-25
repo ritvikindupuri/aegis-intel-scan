@@ -189,7 +189,7 @@ Be extremely thorough. This should read like a real penetration test report from
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: 'google/gemini-3-flash-preview',
         messages: [
           { role: 'system', content: 'You are a Principal Cybersecurity Analyst at a Fortune 500 security consulting firm. You produce enterprise-grade threat intelligence reports that meet the standards of firms like CrowdStrike, Mandiant, and Recorded Future. Your reports are thorough, technically precise, and actionable. Always reference real security frameworks (OWASP, NIST, CWE, MITRE ATT&CK) and provide specific CVE references where applicable.' },
           { role: 'user', content: prompt },
