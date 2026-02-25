@@ -29,7 +29,8 @@ const Dashboard = () => {
 
   const totalScans = scans.length;
   const totalVulns = scans.reduce((sum, s) => sum + (s.vulnerabilities_found || 0), 0);
-  const avgRisk = totalScans ? Math.round(scans.reduce((sum, s) => sum + (s.risk_score || 0), 0) / totalScans) : 0;
+  const completedScans = scans.filter(s => s.status === 'completed' && s.risk_score != null);
+  const avgRisk = completedScans.length ? Math.round(completedScans.reduce((sum, s) => sum + (s.risk_score || 0), 0) / completedScans.length) : 0;
   const uniqueDomains = new Set(scans.map(s => s.domain)).size;
 
   const techCounts: Record<string, number> = {};
