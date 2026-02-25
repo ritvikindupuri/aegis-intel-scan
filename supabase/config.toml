@@ -1,1 +1,7 @@
 project_id = "vlyjdhbblbqeqrdaxglc"
+
+[functions.firecrawl-scan]
+verify_jwt = false
+
+[functions.analyze-threats]
+verify_jwt = false
