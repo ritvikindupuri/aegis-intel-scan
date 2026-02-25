@@ -12,8 +12,7 @@
 1. [Executive Summary](#1-executive-summary)
 2. [System Architecture Deep Dive](#2-system-architecture-deep-dive)
    - 2.1 [High-Level Data Flow](#21-high-level-data-flow)
-   - 2.2 [Component Architecture](#22-component-architecture)
-   - 2.3 [Routing & Protected Routes](#23-routing--protected-routes)
+   - 2.2 [Routing & Protected Routes](#22-routing--protected-routes)
 3. [Database Schema](#3-database-schema)
    - 3.1 [scans Table](#31-scans-table)
    - 3.2 [findings Table](#32-findings-table)
@@ -138,53 +137,9 @@ flowchart TD
     - **Interactive AI Chat** (`analyze-surface`) — A conversational analyst chatbot powered by Gemini Flash.
     - **PDF Export** — A branded, paginated PDF document generated client-side with jsPDF.
 
-With the data flow established, the next question is how the codebase itself is organized to support this pipeline.
+With the data flow established, the next question is how routing and access control determine which parts of the UI a user can reach.
 
-### 2.2 Component Architecture
-
-```
-src/
-├── pages/
-│   ├── Auth.tsx          # Sign in / Sign up with Google OAuth
-│   ├── Index.tsx         # Dashboard with stats, recent scans, scan form
-│   ├── ScanDetail.tsx    # Full scan results (4 tabs: Findings, Surface, Report, Raw Data)
-│   ├── History.tsx       # All scans list with delete capability
-│   ├── Compare.tsx       # Side-by-side scan comparison
-│   ├── Policies.tsx      # Domain policy management + audit log
-│   └── NotFound.tsx      # 404 error page
-├── components/
-│   ├── AppLayout.tsx     # Header nav, logo, user avatar popover, sign out
-│   ├── AuthProvider.tsx  # Session context provider (onAuthStateChange + getSession)
-│   ├── ScanForm.tsx      # Domain input with two-phase submit (evaluate then scan)
-│   ├── AiChatPanel.tsx   # Interactive AI analyst chatbot with markdown rendering
-│   ├── AiSurfaceInsight.tsx  # One-click AI analysis button for surface sections
-│   ├── RiskScoreBreakdown.tsx # Detailed risk visualization with bar chart
-│   ├── SeverityBadge.tsx # SeverityBadge, StatusBadge, RiskScoreGauge exports
-│   ├── PageTransition.tsx # Framer Motion page transitions + stagger/fadeInUp/scaleIn
-│   └── NavLink.tsx       # React Router NavLink wrapper with active state classes
-├── lib/
-│   ├── api.ts            # API layer (scan, evaluate, report, CRUD operations)
-│   ├── pdf-export.ts     # PDF report generation engine (jsPDF)
-│   └── utils.ts          # Utility functions (cn helper)
-└── integrations/
-    ├── supabase/
-    │   ├── client.ts     # Auto-generated Supabase client
-    │   └── types.ts      # Auto-generated database types
-    └── lovable/
-        └── index.ts      # Google OAuth integration (lovable.auth)
-
-supabase/functions/
-├── firecrawl-scan/       # Main scan orchestration
-├── analyze-threats/      # AI threat report generation (Gemini Pro)
-├── analyze-surface/      # AI interactive analysis (Gemini Flash) — 7 section handlers
-└── evaluate-domain/      # AI domain policy evaluation (Gemini Flash Lite)
-```
-
-<p align="center"><em>Figure 2 — Project File Structure and Component Organization</em></p>
-
-These components don't all render on every page — React Router controls which pages are mounted based on the current URL, and a protected-route wrapper ensures unauthenticated users never reach the application interior.
-
-### 2.3 Routing & Protected Routes
+### 2.2 Routing & Protected Routes
 
 ```mermaid
 flowchart LR
@@ -211,7 +166,7 @@ flowchart LR
     PoliciesPage --> AppLayout
 ```
 
-<p align="center"><em>Figure 3 — Application Routing Map with Protected Route Guards</em></p>
+<p align="center"><em>Figure 2 — Application Routing Map with Protected Route Guards</em></p>
 
 **Step-by-step routing breakdown:**
 
@@ -362,7 +317,7 @@ erDiagram
     domain_policies ||--o{ scan_audit_log : "generates"
 ```
 
-<p align="center"><em>Figure 4 — Database Entity Relationship Diagram</em></p>
+<p align="center"><em>Figure 3 — Database Entity Relationship Diagram</em></p>
 
 **Step-by-step schema relationship breakdown:**
 
@@ -437,7 +392,7 @@ flowchart TD
     M --> Output["OUTPUT:\nscanId, urlsFound\nfindingsCount, riskScore"]
 ```
 
-<p align="center"><em>Figure 5 — Firecrawl Scan Pipeline: Complete Orchestration Flow</em></p>
+<p align="center"><em>Figure 4 — Firecrawl Scan Pipeline: Complete Orchestration Flow</em></p>
 
 **Step-by-step pipeline breakdown:**
 
@@ -591,7 +546,7 @@ flowchart TD
     J --> Output["OUTPUT:\nallowed, policy,\nreason, ai_evaluated"]
 ```
 
-<p align="center"><em>Figure 6 — AI Domain Policy Agent: Evaluation Decision Flow</em></p>
+<p align="center"><em>Figure 5 — AI Domain Policy Agent: Evaluation Decision Flow</em></p>
 
 **Step-by-step policy evaluation breakdown:**
 
@@ -653,7 +608,7 @@ flowchart TD
     end
 ```
 
-<p align="center"><em>Figure 7 — Firecrawl Web Scraping Pipeline: Two-Phase Data Acquisition and Parsing</em></p>
+<p align="center"><em>Figure 6 — Firecrawl Web Scraping Pipeline: Two-Phase Data Acquisition and Parsing</em></p>
 
 **Step-by-step scraping breakdown:**
 
@@ -727,7 +682,7 @@ flowchart LR
     AnalyzeSurface -- "interactive\nchat + insights" --> Model
 ```
 
-<p align="center"><em>Figure 8 — Unified AI Model Strategy: All Functions Use Gemini 3 Flash Preview</em></p>
+<p align="center"><em>Figure 7 — Unified AI Model Strategy: All Functions Use Gemini 3 Flash Preview</em></p>
 
 **Step-by-step model strategy breakdown:**
 
@@ -989,7 +944,7 @@ flowchart TD
     P -- "NO" --> S["signOut()\ntoast: No account found"]
 ```
 
-<p align="center"><em>Figure 9 — Authentication Flow: Google OAuth with Profile-Based Registration Gate</em></p>
+<p align="center"><em>Figure 8 — Authentication Flow: Google OAuth with Profile-Based Registration Gate</em></p>
 
 **Step-by-step authentication breakdown:**
 
@@ -1043,7 +998,7 @@ flowchart LR
     Cap --> Score["Risk Score\n0 - 100"]
 ```
 
-<p align="center"><em>Figure 10 — Risk Score Calculation: Weighted Severity Sum Capped at 100</em></p>
+<p align="center"><em>Figure 9 — Risk Score Calculation: Weighted Severity Sum Capped at 100</em></p>
 
 **Step-by-step scoring breakdown:**
 

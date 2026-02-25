@@ -7,22 +7,7 @@
 
 ---
 
-## Executive Summary
-
-ThreatLens is an AI-powered cybersecurity platform that automates threat intelligence gathering and attack surface mapping for web domains. It combines automated web crawling via the Firecrawl API with multi-model AI analysis to deliver comprehensive security assessments — including vulnerability detection, security header analysis, technology fingerprinting, and actionable remediation guidance.
-
-The platform features an AI domain policy agent that prevents misuse by automatically evaluating scan targets, an interactive AI analyst chatbot for deep-dive investigations, and a full reporting suite with PDF export capabilities.
-
----
-
-## Table of Contents
-
-- [Key Features](#key-features)
-- [System Architecture](#system-architecture)
-- [Tech Stack](#tech-stack)
-- [Setup & Installation](#setup--installation)
-- [Technical Documentation](#technical-documentation)
-- [Conclusion](#conclusion)
+ThreatLens is an AI-powered cybersecurity platform that automates threat intelligence gathering and attack surface mapping for web domains. It combines automated web crawling via the Firecrawl API with AI analysis powered by Google's Gemini 3 Flash Preview to deliver comprehensive security assessments — including vulnerability detection, security header analysis, technology fingerprinting, and actionable remediation guidance. The platform features an AI domain policy agent that prevents misuse, an interactive AI analyst chatbot for deep-dive investigations, and a full reporting suite with PDF export capabilities.
 
 ---
 
@@ -34,7 +19,7 @@ The platform features an AI domain policy agent that prevents misuse by automati
 - **Attack Surface Analysis** — Discovered endpoints, client-side scripts, input vectors, external dependencies, and security header assessment with interactive tooltips
 - **Vulnerability Detection** — Missing security headers, exposed admin panels, suspicious query parameters, XSS input points, outdated libraries, and supply chain risks
 - **Risk Scoring** — Composite 0–100 score calculated from weighted severity findings (Critical: 25pts, High: 15pts, Medium: 8pts, Low: 3pts, Info: 1pt)
-- **AI Threat Reports** — One-click comprehensive reports with executive summary, vulnerability analysis, and remediation roadmap (Gemini 3 Flash Preview)
+- **AI Threat Reports** — One-click comprehensive reports with executive summary, vulnerability analysis, and remediation roadmap
 - **PDF Export** — Professional branded reports with cover page, findings summary, AI insights, and confidential watermarking
 - **Scan Comparison** — Side-by-side delta analysis of risk scores, vulnerabilities, technologies, and endpoints between any two scans
 - **Authentication** — Google OAuth with profile-based registration gate and protected routes
@@ -81,14 +66,12 @@ graph TB
 
 <p align="center"><em>Figure 1 — ThreatLens System Architecture Overview</em></p>
 
-**Architecture breakdown:**
-
 - **Client Layer** — A React SPA (built with Vite + TypeScript) renders four main pages: Dashboard, Scan Detail, History/Compare, and Policies. All backend communication flows through a single Supabase JS client instance.
-- **Lovable Cloud** — Four serverless Deno edge functions handle all backend compute: scan orchestration, AI threat reports, interactive AI chat, and domain policy evaluation. PostgreSQL stores all persistent data (scans, findings, profiles, policies, audit logs), and Google OAuth manages authentication.
-- **External Services** — Two external APIs are consumed: Firecrawl for web scraping (HTML extraction + site mapping) and the Lovable AI Gateway for all AI inference. All three edge functions now route through a single model — `google/gemini-3-flash-preview` — for classification, interactive analysis, and report generation alike.
-- **Data Flow** — A user enters a domain → the policy agent evaluates it → Firecrawl scrapes and maps the site → parsed data is stored → findings are generated → the user can then trigger AI reports, chat with the AI analyst, or export PDFs.
+- **Lovable Cloud** — Four serverless Deno edge functions handle all backend compute: scan orchestration (`firecrawl-scan`), AI threat reports (`analyze-threats`), interactive AI chat (`analyze-surface`), and domain policy evaluation (`evaluate-domain`). PostgreSQL stores all persistent data across five tables (scans, findings, profiles, domain_policies, scan_audit_log). Google OAuth manages user authentication.
+- **External Services** — Two external APIs are consumed: Firecrawl for web scraping (HTML extraction via `/v1/scrape` + site mapping via `/v1/map`) and the Lovable AI Gateway for all AI inference using `google/gemini-3-flash-preview`.
+- **Data Flow** — A user enters a domain → the policy agent evaluates it (allow/block/review) → Firecrawl scrapes and maps the site → raw data is parsed into endpoints, technologies, headers, and forms → findings are generated across six categories → a risk score is calculated → the user can then trigger AI reports, chat with the AI analyst, or export PDFs.
 
-ThreatLens follows a three-tier architecture: a React SPA on the client, four serverless edge functions for backend compute, and PostgreSQL for persistence — all orchestrated through Lovable Cloud. For a detailed breakdown of every component, data flow, and system interaction, see the [Technical Documentation](./TECHNICAL_DOCS.md).
+For comprehensive technical documentation covering every system flow, database schema, AI integration, and security architecture in detail, see **[TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md)**.
 
 ---
 
@@ -147,19 +130,3 @@ ThreatLens follows a three-tier architecture: a React SPA on the client, four se
 
 6. **Access the app**
    Open `http://localhost:5173` in your browser. Sign up with Google to create an account.
-
----
-
-## Technical Documentation
-
-For comprehensive technical documentation covering every component, system flow, AI integration, database schema, and security architecture in detail, see:
-
-**[TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md)**
-
----
-
-## Conclusion
-
-ThreatLens demonstrates how modern AI capabilities can be combined with automated web reconnaissance to create a practical, accessible threat intelligence platform. All AI-powered features — domain policy evaluation, interactive analysis, and comprehensive threat reports — are powered by Google's latest `gemini-3-flash-preview` model through the Lovable AI Gateway, delivering fast, high-quality inference across the board.
-
-The AI domain policy agent adds a critical layer of responsible use — ensuring the scanning capabilities cannot be weaponized against sensitive targets while maintaining ease of use for legitimate security assessments. The combination of automated detection, interactive AI analysis, and professional reporting makes ThreatLens a comprehensive tool for security professionals and organizations looking to understand and reduce their attack surface.
