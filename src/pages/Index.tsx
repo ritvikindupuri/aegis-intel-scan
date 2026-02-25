@@ -55,34 +55,39 @@ const Dashboard = () => {
     <motion.div className="space-y-8" variants={staggerContainer} initial="initial" animate="animate">
       <motion.div variants={fadeInUp} className="relative flex flex-col items-center text-center gap-5 py-16 overflow-hidden">
         {/* Animated background */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.12)_0%,transparent_60%)]" />
           <motion.div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-primary/5"
-            animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.1, 0.3] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full border border-primary/10"
+            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.15, 0.5] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-primary/10"
-            animate={{ scale: [1.1, 1, 1.1], opacity: [0.15, 0.3, 0.15] }}
-            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] rounded-full border border-primary/15"
+            animate={{ scale: [1.15, 0.95, 1.15], opacity: [0.2, 0.5, 0.2] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
           />
           <motion.div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full bg-primary/5 blur-3xl"
-            animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.2, 0.4] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[180px] h-[180px] rounded-full bg-primary/10 blur-2xl"
+            animate={{ scale: [1, 1.4, 1], opacity: [0.5, 0.2, 0.5] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
           />
         </div>
 
         <div className="relative z-10 flex flex-col items-center gap-5">
-          <motion.img
-            src={threatLensLogo}
-            alt="ThreatLens"
-            className="h-14 w-14"
+          <motion.div
+            className="relative"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-          />
+          >
+            <img src={threatLensLogo} alt="ThreatLens" className="h-14 w-14 rounded-full object-cover" style={{ background: 'transparent' }} />
+            <motion.div
+              className="absolute -inset-2 rounded-full border border-primary/20"
+              animate={{ scale: [1, 1.15, 1], opacity: [0.6, 0, 0.6] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }}
+            />
+          </motion.div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               <span className="text-gradient-primary">Threat</span>Lens
