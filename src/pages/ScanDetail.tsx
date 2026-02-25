@@ -6,10 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getScan, getFindings, generateReport, type Scan, type Finding } from "@/lib/api";
 import { SeverityBadge, RiskScoreGauge, StatusBadge } from "@/components/SeverityBadge";
-import { RiskScoreBreakdown } from "@/components/RiskScoreBreakdown";
 import { exportReportAsPdf } from "@/lib/pdf-export";
-import { AiSurfaceInsight } from "@/components/AiSurfaceInsight";
-import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code, Download, Info } from "lucide-react";
+import { AiChatPanel } from "@/components/AiChatPanel";
+import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code, Download, Info, Check, X as XIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -88,6 +87,28 @@ const ScanDetail = () => {
   const parsed = scan.parsed_data || {};
   const enrichment = scan.enrichment || {};
 
+  // Build surface context for AI chat
+  const surfaceContextData = {
+    securityHeaders: parsed.securityHeaders,
+    endpoints: parsed.urls || [],
+    jsFiles: parsed.jsFiles || [],
+    forms: parsed.forms || [],
+    externalDependencies: parsed.externalDependencies || [],
+    technologies: scan.technologies || [],
+  };
+
+  // Compute severity counts for tooltip
+  const sevCounts: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  for (const f of findings) {
+    const s = f.severity.toLowerCase();
+    if (sevCounts[s] !== undefined) sevCounts[s]++;
+  }
+
+  // Compute header stats for summary table
+  const secHeaders = parsed.securityHeaders || {};
+  const headersPresent = Object.values(secHeaders).filter((v: any) => v !== 'Not Set').length;
+  const headersMissing = Object.values(secHeaders).filter((v: any) => v === 'Not Set').length;
+
   return (
     <motion.div className="space-y-6" variants={staggerContainer} initial="initial" animate="animate">
       {/* Header */}
@@ -153,12 +174,33 @@ const ScanDetail = () => {
         <>
           {/* Stats Row */}
           <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Card className="bg-card border-border">
-              <CardContent className="p-4">
-                <RiskScoreGauge score={scan.risk_score} />
-              </CardContent>
-            </Card>
             <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className="bg-card border-border cursor-help">
+                    <CardContent className="p-4">
+                      <RiskScoreGauge score={scan.risk_score} />
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[300px] text-xs leading-relaxed space-y-2 p-3">
+                  <p className="font-semibold text-foreground">How Risk Score is Calculated</p>
+                  <p>Score = Σ (finding count × severity weight), capped at 100.</p>
+                  <div className="font-mono text-[10px] text-muted-foreground space-y-0.5">
+                    <div>Critical = ×25 · High = ×15 · Medium = ×8</div>
+                    <div>Low = ×3 · Info = ×1</div>
+                  </div>
+                  <div className="text-[10px] pt-1 border-t border-border space-y-0.5">
+                    {Object.entries(sevCounts).filter(([,c]) => c > 0).map(([s, c]) => (
+                      <div key={s} className="flex justify-between">
+                        <span className="capitalize">{s}</span>
+                        <span>{c} × {{ critical: 25, high: 15, medium: 8, low: 3, info: 1 }[s]} = {c * ({ critical: 25, high: 15, medium: 8, low: 3, info: 1 }[s] || 0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+
               {[
                 { label: "URLs Found", value: scan.urls_found, icon: Link2, tip: "Total unique URLs discovered by crawling the target domain. The scanner follows internal links up to a configured depth, collecting every reachable page, API route, and asset URL." },
                 { label: "Vulnerabilities", value: scan.vulnerabilities_found, icon: AlertTriangle, tip: "Count of security findings identified by analyzing crawled data — including missing headers, exposed admin panels, information leaks, outdated libraries, and misconfigurations." },
@@ -186,9 +228,26 @@ const ScanDetail = () => {
             </TooltipProvider>
           </motion.div>
 
-          {/* Risk Score Breakdown */}
+          {/* Severity Determination (compact) */}
           <motion.div variants={fadeInUp}>
-            <RiskScoreBreakdown score={scan.risk_score} findings={findings} />
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-2">How Risk Severity is Determined</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {[
+                    { sev: "Critical", color: "text-severity-critical", desc: "Data leaks, exposed configs, database tools" },
+                    { sev: "High", color: "text-severity-high", desc: "Missing CSP, admin panels, open redirects" },
+                    { sev: "Medium", color: "text-severity-medium", desc: "Missing HSTS/X-Frame-Options, XSS vectors" },
+                    { sev: "Low", color: "text-severity-low", desc: "Outdated libs, excessive dependencies" },
+                  ].map(({ sev, color, desc }) => (
+                    <div key={sev} className="flex items-start gap-2 py-1.5 px-2.5 rounded-md bg-secondary/30">
+                      <span className={`text-[10px] font-bold ${color} shrink-0 mt-0.5`}>{sev}</span>
+                      <span className="text-[10px] text-muted-foreground leading-relaxed">{desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* Enrichment */}
@@ -241,7 +300,10 @@ const ScanDetail = () => {
               </TabsList>
 
               {/* Findings Tab */}
-              <TabsContent value="findings">
+              <TabsContent value="findings" className="space-y-4">
+                {/* AI Chat for Findings */}
+                <AiChatPanel context="findings" contextData={findings} domain={scan.domain} onInsight={handleInsightGenerated} />
+
                 {findings.length === 0 ? (
                   <Card className="bg-card border-border">
                     <CardContent className="p-8 text-center text-muted-foreground">
@@ -280,6 +342,66 @@ const ScanDetail = () => {
 
               {/* Attack Surface Tab */}
               <TabsContent value="surface" className="space-y-4">
+                {/* Summary Table */}
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                      <Shield className="h-3.5 w-3.5 text-primary" /> Attack Surface Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-3 text-muted-foreground font-medium">Category</th>
+                            <th className="text-center py-2 px-3 text-muted-foreground font-medium">Count</th>
+                            <th className="text-left py-2 px-3 text-muted-foreground font-medium">Status</th>
+                            <th className="text-left py-2 px-3 text-muted-foreground font-medium">Risk Implication</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-mono">
+                          <tr className="border-b border-border/50 hover:bg-secondary/30">
+                            <td className="py-2 px-3 flex items-center gap-2"><Shield className="h-3 w-3 text-primary" /> Security Headers</td>
+                            <td className="text-center py-2 px-3">{headersPresent + headersMissing}</td>
+                            <td className="py-2 px-3">
+                              <span className="text-success">{headersPresent} set</span> · <span className="text-destructive">{headersMissing} missing</span>
+                            </td>
+                            <td className="py-2 px-3 font-sans text-muted-foreground">{headersMissing > 3 ? "High — multiple protections absent" : headersMissing > 0 ? "Medium — some gaps" : "Low — well configured"}</td>
+                          </tr>
+                          <tr className="border-b border-border/50 hover:bg-secondary/30">
+                            <td className="py-2 px-3 flex items-center gap-2"><Link2 className="h-3 w-3 text-primary" /> Endpoints</td>
+                            <td className="text-center py-2 px-3">{(parsed.urls || []).length}</td>
+                            <td className="py-2 px-3">{(parsed.urls || []).length} discovered</td>
+                            <td className="py-2 px-3 font-sans text-muted-foreground">{(parsed.urls || []).length > 50 ? "High — large surface" : (parsed.urls || []).length > 15 ? "Medium" : "Low"}</td>
+                          </tr>
+                          <tr className="border-b border-border/50 hover:bg-secondary/30">
+                            <td className="py-2 px-3 flex items-center gap-2"><ExternalLink className="h-3 w-3 text-primary" /> External Deps</td>
+                            <td className="text-center py-2 px-3">{(parsed.externalDependencies || []).length}</td>
+                            <td className="py-2 px-3">{(parsed.externalDependencies || []).length} loaded</td>
+                            <td className="py-2 px-3 font-sans text-muted-foreground">{(parsed.externalDependencies || []).length > 10 ? "High — supply chain risk" : (parsed.externalDependencies || []).length > 3 ? "Medium" : "Low"}</td>
+                          </tr>
+                          <tr className="border-b border-border/50 hover:bg-secondary/30">
+                            <td className="py-2 px-3 flex items-center gap-2"><FileCode className="h-3 w-3 text-primary" /> JS Files</td>
+                            <td className="text-center py-2 px-3">{(parsed.jsFiles || []).length}</td>
+                            <td className="py-2 px-3">{(parsed.jsFiles || []).length} scripts</td>
+                            <td className="py-2 px-3 font-sans text-muted-foreground">Client-side exposure vector</td>
+                          </tr>
+                          <tr className="hover:bg-secondary/30">
+                            <td className="py-2 px-3 flex items-center gap-2"><FormInput className="h-3 w-3 text-primary" /> Input Vectors</td>
+                            <td className="text-center py-2 px-3">{(parsed.forms || []).length}</td>
+                            <td className="py-2 px-3">{(parsed.forms || []).length} forms</td>
+                            <td className="py-2 px-3 font-sans text-muted-foreground">{(parsed.forms || []).length > 0 ? "Injection / CSRF targets" : "None found"}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Unified AI Chat for Attack Surface */}
+                <AiChatPanel context="surface" contextData={surfaceContextData} domain={scan.domain} onInsight={handleInsightGenerated} />
+
                 {/* Surface overview stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
@@ -302,7 +424,7 @@ const ScanDetail = () => {
                   ))}
                 </div>
 
-                {/* Technologies with categories */}
+                {/* Technologies */}
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
@@ -322,12 +444,12 @@ const ScanDetail = () => {
                       </div>
                     )}
                     <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                      Technologies are fingerprinted from response headers, meta tags, JavaScript libraries, and HTML patterns. Known CVEs for detected versions should be cross-referenced.
+                      Technologies are fingerprinted from response headers, meta tags, JavaScript libraries, and HTML patterns.
                     </p>
                   </CardContent>
                 </Card>
 
-                {/* Security Headers - enhanced */}
+                {/* Security Headers */}
                 {parsed.securityHeaders && (
                   <Card className="bg-card border-border">
                     <CardHeader className="pb-3">
@@ -355,7 +477,6 @@ const ScanDetail = () => {
                       <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
                         Missing security headers expose the application to clickjacking, XSS, MIME sniffing, and protocol downgrade attacks.
                       </p>
-                      <AiSurfaceInsight section="security_headers" data={parsed.securityHeaders} domain={scan.domain} onAnalysis={handleInsightGenerated} />
                     </CardContent>
                   </Card>
                 )}
@@ -380,9 +501,6 @@ const ScanDetail = () => {
                       )}
                     </div>
                     {(parsed.urls || []).length === 0 && <span className="text-xs text-muted-foreground">No endpoints discovered</span>}
-                    {(parsed.urls || []).length > 0 && (
-                      <AiSurfaceInsight section="endpoints" data={parsed.urls || []} domain={scan.domain} onAnalysis={handleInsightGenerated} />
-                    )}
                   </CardContent>
                 </Card>
 
@@ -451,7 +569,6 @@ const ScanDetail = () => {
                         ))}
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-2">Third-party dependencies increase supply chain attack surface. Verify integrity with SRI hashes.</p>
-                      <AiSurfaceInsight section="dependencies" data={parsed.externalDependencies || []} domain={scan.domain} onAnalysis={handleInsightGenerated} />
                     </CardContent>
                   </Card>
                 )}
@@ -499,7 +616,7 @@ const ScanDetail = () => {
 
               {/* Raw Data Tab */}
               <TabsContent value="raw" className="space-y-4">
-                <AiSurfaceInsight section="raw_data" data={scan.raw_crawl_data} domain={scan.domain} onAnalysis={handleInsightGenerated} />
+                <AiChatPanel context="raw_data" contextData={scan.raw_crawl_data} domain={scan.domain} onInsight={handleInsightGenerated} />
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xs font-medium flex items-center gap-2 uppercase tracking-wider text-muted-foreground">

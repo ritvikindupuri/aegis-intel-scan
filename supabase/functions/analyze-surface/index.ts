@@ -112,6 +112,39 @@ Produce a structured intelligence briefing with the following sections:
 - Priority actions
 
 Keep it clear, professional, and actionable. Use markdown formatting. Avoid repeating raw data verbatim — interpret and contextualize it.`;
+    } else if (section === 'surface_chat') {
+      const question = data.question;
+      const contextStr = JSON.stringify(data.data, null, 2).slice(0, 10000);
+      prompt = `You are a Principal Cybersecurity Analyst. The analyst is reviewing the attack surface of "${domain}" and asks:
+
+"${question}"
+
+Here is the attack surface data (security headers, endpoints, technologies, JS files, forms, external dependencies):
+${contextStr}
+
+Answer the analyst's question directly using the data provided. Be specific, technical, and actionable. Reference OWASP/CWE/MITRE ATT&CK where relevant. Use markdown.`;
+    } else if (section === 'findings_chat') {
+      const question = data.question;
+      const contextStr = JSON.stringify(data.data, null, 2).slice(0, 10000);
+      prompt = `You are a Principal Cybersecurity Analyst. The analyst is reviewing security findings for "${domain}" and asks:
+
+"${question}"
+
+Here are the security findings:
+${contextStr}
+
+Answer the analyst's question directly. Prioritize by severity. Suggest remediation steps. Reference OWASP/CWE/MITRE ATT&CK where relevant. Use markdown.`;
+    } else if (section === 'raw_data_chat') {
+      const question = data.question;
+      const contextStr = JSON.stringify(data.data, null, 2).slice(0, 12000);
+      prompt = `You are a Principal Threat Intelligence Analyst. The analyst is reviewing raw crawl data for "${domain}" and asks:
+
+"${question}"
+
+Here is the raw crawl data (truncated):
+${contextStr}
+
+Answer the analyst's question directly using the raw data. Interpret and contextualize — don't repeat data verbatim. Be technical and actionable. Use markdown.`;
     } else {
       return new Response(JSON.stringify({ error: 'Invalid section' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
