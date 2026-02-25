@@ -317,7 +317,7 @@ erDiagram
     domain_policies ||--o{ scan_audit_log : "generates"
 ```
 
-<p align="center"><em>Figure 3 — Database Entity Relationship Diagram</em></p>
+<p align="center"><em>Figure 1 — Database Entity Relationship Diagram</em></p>
 
 **Step-by-step schema relationship breakdown:**
 
@@ -392,7 +392,7 @@ flowchart TD
     M --> Output["OUTPUT:\nscanId, urlsFound\nfindingsCount, riskScore"]
 ```
 
-<p align="center"><em>Figure 4 — Firecrawl Scan Pipeline: Complete Orchestration Flow</em></p>
+<p align="center"><em>Figure 1 — Firecrawl Scan Pipeline: Complete Orchestration Flow</em></p>
 
 **Step-by-step pipeline breakdown:**
 
@@ -546,7 +546,7 @@ flowchart TD
     J --> Output["OUTPUT:\nallowed, policy,\nreason, ai_evaluated"]
 ```
 
-<p align="center"><em>Figure 5 — AI Domain Policy Agent: Evaluation Decision Flow</em></p>
+<p align="center"><em>Figure 2 — AI Domain Policy Agent: Evaluation Decision Flow</em></p>
 
 **Step-by-step policy evaluation breakdown:**
 
@@ -608,7 +608,7 @@ flowchart TD
     end
 ```
 
-<p align="center"><em>Figure 6 — Firecrawl Web Scraping Pipeline: Two-Phase Data Acquisition and Parsing</em></p>
+<p align="center"><em>Figure 1 — Firecrawl Web Scraping Pipeline: Two-Phase Data Acquisition and Parsing</em></p>
 
 **Step-by-step scraping breakdown:**
 
@@ -682,7 +682,7 @@ flowchart LR
     AnalyzeSurface -- "interactive\nchat + insights" --> Model
 ```
 
-<p align="center"><em>Figure 7 — Unified AI Model Strategy: All Functions Use Gemini 3 Flash Preview</em></p>
+<p align="center"><em>Figure 1 — Unified AI Model Strategy: All Functions Use Gemini 3 Flash Preview</em></p>
 
 **Step-by-step model strategy breakdown:**
 
@@ -978,7 +978,7 @@ flowchart TD
     P -- "NO" --> S["signOut()\ntoast: No account found"]
 ```
 
-<p align="center"><em>Figure 8 — Authentication Flow: Google OAuth with Profile-Based Registration Gate</em></p>
+<p align="center"><em>Figure 1 — Authentication Flow: Google OAuth with Profile-Based Registration Gate</em></p>
 
 **Step-by-step authentication breakdown:**
 
@@ -1032,7 +1032,7 @@ flowchart LR
     Cap --> Score["Risk Score\n0 - 100"]
 ```
 
-<p align="center"><em>Figure 9 — Risk Score Calculation: Weighted Severity Sum Capped at 100</em></p>
+<p align="center"><em>Figure 1 — Risk Score Calculation: Weighted Severity Sum Capped at 100</em></p>
 
 **Step-by-step scoring breakdown:**
 
