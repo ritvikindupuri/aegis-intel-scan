@@ -7,6 +7,7 @@ import { getScan, getFindings, generateReport, type Scan, type Finding } from "@
 import { SeverityBadge, RiskScoreGauge, StatusBadge } from "@/components/SeverityBadge";
 import { RiskScoreBreakdown } from "@/components/RiskScoreBreakdown";
 import { exportReportAsPdf } from "@/lib/pdf-export";
+import { AiSurfaceInsight } from "@/components/AiSurfaceInsight";
 import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -336,6 +337,7 @@ const ScanDetail = () => {
                       <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
                         Missing security headers expose the application to clickjacking, XSS, MIME sniffing, and protocol downgrade attacks.
                       </p>
+                      <AiSurfaceInsight section="security_headers" data={parsed.securityHeaders} domain={scan.domain} />
                     </CardContent>
                   </Card>
                 )}
@@ -360,6 +362,9 @@ const ScanDetail = () => {
                       )}
                     </div>
                     {(parsed.urls || []).length === 0 && <span className="text-xs text-muted-foreground">No endpoints discovered</span>}
+                    {(parsed.urls || []).length > 0 && (
+                      <AiSurfaceInsight section="endpoints" data={parsed.urls || []} domain={scan.domain} />
+                    )}
                   </CardContent>
                 </Card>
 
@@ -428,6 +433,7 @@ const ScanDetail = () => {
                         ))}
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-2">Third-party dependencies increase supply chain attack surface. Verify integrity with SRI hashes.</p>
+                      <AiSurfaceInsight section="dependencies" data={parsed.externalDependencies || []} domain={scan.domain} />
                     </CardContent>
                   </Card>
                 )}
