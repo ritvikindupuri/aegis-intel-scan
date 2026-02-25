@@ -60,9 +60,13 @@ The platform is designed with three core principles:
 2. **Intelligence** — Leverage AI models for context-aware analysis
 3. **Responsibility** — Prevent misuse via an AI domain policy gatekeeper
 
+To understand how these principles translate into a working system, the next section dissects the architecture that ties the frontend, backend, and external services together into a unified pipeline.
+
 ---
 
 ## 2. System Architecture Deep Dive
+
+The architecture of ThreatLens follows a three-tier model: a React single-page application on the client, serverless edge functions for compute, and PostgreSQL for persistence — all orchestrated through Lovable Cloud. This section walks through the data flow, component organization, and routing structure that make the platform work.
 
 ### 2.1 High-Level Data Flow
 
@@ -115,6 +119,8 @@ flowchart TD
 
 **Flow Explanation:** The diagram traces the complete lifecycle of a scan request. When a user enters a domain, it first passes through the **AI Domain Policy Agent** (`evaluate-domain`), which classifies the domain as allowed, blocked, or review using Gemini Flash Lite. Only allowed domains proceed to the **Firecrawl Scan Pipeline** (`firecrawl-scan`), which orchestrates two Firecrawl API calls — a scrape for full HTML content and a map for site-wide URL discovery. The raw data then enters a multi-stage **parsing pipeline** that extracts endpoints, JavaScript files, HTML forms, external dependencies, and technologies via 20 regex patterns. Security headers are analyzed from the response metadata, and enrichment data (WHOIS, hosting info) is generated. The parsed data feeds into a **finding generation engine** that checks for security header gaps, sensitive exposed paths, suspicious query parameters, XSS input points, technology risks, and supply chain vulnerabilities. Each finding is assigned a severity (critical/high/medium/low/info), and a **composite risk score** is calculated from the weighted sum (capped at 100). Everything is persisted to PostgreSQL, and the frontend polls every 3 seconds until the scan completes. From the completed scan, users can trigger three output paths: an **AI threat report** (Gemini Pro), an **interactive AI chatbot** (Gemini Flash), or a **PDF export** (jsPDF).
 
+With the data flow established, the next question is how the codebase itself is organized to support this pipeline.
+
 ### 2.2 Component Architecture
 
 ```
@@ -157,6 +163,8 @@ supabase/functions/
 
 <p align="center"><em>Figure 2 — Project File Structure and Component Organization</em></p>
 
+These components don't all render on every page — React Router controls which pages are mounted based on the current URL, and a protected-route wrapper ensures unauthenticated users never reach the application interior.
+
 ### 2.3 Routing & Protected Routes
 
 ```mermaid
@@ -188,12 +196,16 @@ flowchart LR
 
 **Routing Explanation:** The application uses React Router v6 with a `ProtectedRoute` wrapper component defined in `App.tsx`. Public routes (`/auth` and the 404 catch-all) are accessible without authentication. All other routes are protected — if no session exists, the user is redirected to `/auth`. The `/auth` route itself checks for an existing session and redirects authenticated users to `/` to prevent accessing the login page when already signed in. Every protected route is wrapped with two higher-order components: `AppLayout` (which renders the sticky header with navigation, logo, and user avatar popover) and `PageTransition` (which applies Framer Motion fade + slide animations for smooth page transitions).
 
+Now that we've seen how data flows through the system and how the client is organized, the next layer to examine is where all of this data lives — the PostgreSQL database schema that underpins every scan, finding, policy, and user profile.
+
 ---
 
 ## 3. Database Schema
 
+The database is the backbone of ThreatLens, storing everything from raw crawl data to AI-generated reports. Five tables work together to support the scan lifecycle, vulnerability tracking, user management, domain policy enforcement, and audit logging. Each table is designed with specific JSONB columns to accommodate the flexible, deeply nested data structures that web scraping and AI analysis produce.
+
 ### 3.1 `scans` Table
-The primary table storing all scan results.
+The primary table storing all scan results. Every scan begins as a `crawling` record and progresses through `analyzing` to `completed` (or `failed`). The JSONB columns (`raw_crawl_data`, `parsed_data`, `enrichment`, `technologies`) store the full depth of scraping and analysis results without requiring rigid column definitions.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -213,7 +225,7 @@ The primary table storing all scan results.
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
 ### 3.2 `findings` Table
-Individual vulnerability findings linked to scans.
+Each scan produces zero or more findings — individual vulnerability detections linked back to the parent scan via `scan_id`. Findings are the atomic units that feed into risk scoring, severity breakdowns, and AI analysis.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -227,7 +239,7 @@ Individual vulnerability findings linked to scans.
 | `created_at` | TIMESTAMPTZ | Creation timestamp |
 
 ### 3.3 `profiles` Table
-User registration records for access control.
+While scans and findings are shared across all users, the `profiles` table is the only user-specific table — it stores registration data from Google OAuth and serves as the registration gate that distinguishes signed-up users from anonymous Google account holders.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -239,7 +251,7 @@ User registration records for access control.
 | `created_at` | TIMESTAMPTZ | Registration timestamp |
 
 ### 3.4 `domain_policies` Table
-AI-evaluated and manually managed domain policies.
+Before any scan executes, the domain must pass through a policy check. This table caches the results of AI evaluations and manual overrides so that repeat scans against the same domain don't require redundant AI calls.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -252,7 +264,7 @@ AI-evaluated and manually managed domain policies.
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
 ### 3.5 `scan_audit_log` Table
-Immutable log of all domain evaluation attempts.
+Every domain evaluation — whether served from the policy cache or freshly evaluated by AI — generates an immutable audit log entry. This table provides the accountability trail visible on the Policies page and is append-only by design.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -263,6 +275,8 @@ Immutable log of all domain evaluation attempts.
 | `created_at` | TIMESTAMPTZ | Timestamp |
 
 ### 3.6 Entity Relationship Diagram
+
+The following diagram shows how these five tables relate to each other. The only true foreign key relationship is between `scans` and `findings` — the other tables are logically connected through shared domain values and the scan lifecycle but remain structurally independent for flexibility and performance.
 
 ```mermaid
 erDiagram
@@ -322,17 +336,21 @@ erDiagram
 
 <p align="center"><em>Figure 4 — Database Entity Relationship Diagram</em></p>
 
-**Schema Explanation:** The database has five tables. The `scans` table is the central entity — each scan produces multiple `findings` (one-to-many relationship via `scan_id` foreign key). The `profiles` table stores user registration data keyed by `user_id` and is the only table with Row Level Security restricted to the owning user. The `domain_policies` table caches AI and manual domain classifications, and each policy evaluation (whether from cache or fresh AI inference) generates an entry in the `scan_audit_log` for immutable audit tracking. The `scans` and `findings` tables are open-access (shared scan data), while `profiles` enforces per-user access control.
+**Schema Explanation:** The `scans` table is the central entity — each scan produces multiple `findings` (one-to-many relationship via `scan_id` foreign key). The `profiles` table stores user registration data keyed by `user_id` and is the only table with Row Level Security restricted to the owning user. The `domain_policies` table caches AI and manual domain classifications, and each policy evaluation (whether from cache or fresh AI inference) generates an entry in the `scan_audit_log` for immutable audit tracking. The `scans` and `findings` tables are open-access (shared scan data), while `profiles` enforces per-user access control.
+
+With the data model defined, the next question is: what code actually reads from and writes to these tables? That's the job of the four serverless edge functions that form ThreatLens's backend compute layer.
 
 ---
 
 ## 4. Edge Functions (Backend)
 
+The backend logic lives entirely in four Deno-based edge functions deployed to Lovable Cloud. Each function serves a distinct role in the scan lifecycle: `firecrawl-scan` orchestrates the crawling and analysis pipeline, `analyze-threats` generates AI reports, `analyze-surface` powers the interactive chatbot, and `evaluate-domain` gates every scan request through the AI policy agent. Together, they transform a raw domain name into structured intelligence — reading from and writing to the database tables described above.
+
 ### 4.1 Firecrawl Scan Pipeline
 
 **File**: `supabase/functions/firecrawl-scan/index.ts`
 
-This is the core orchestration function that manages the entire scan lifecycle. It requires the `FIRECRAWL_API_KEY` secret.
+This is the core orchestration function that manages the entire scan lifecycle. It requires the `FIRECRAWL_API_KEY` secret and is the most complex of the four edge functions — handling everything from API calls to data parsing to finding generation in a single invocation.
 
 #### Process Flow
 
@@ -431,11 +449,13 @@ The `detectTechnologies()` function uses regex pattern matching against the raw 
 | CMS Risk | WordPress detection | Medium |
 | Supply Chain | >10 external dependencies | Low |
 
+Once the scan pipeline completes and findings are stored, users can request deeper analysis. The next two edge functions handle that — generating comprehensive AI reports and powering the interactive chatbot.
+
 ### 4.2 AI Threat Report Generator
 
 **File**: `supabase/functions/analyze-threats/index.ts`
 
-Generates comprehensive enterprise-grade AI threat intelligence reports.
+Generates comprehensive enterprise-grade AI threat intelligence reports. While the scan pipeline handles automated detection, this function adds the layer of AI reasoning — interpreting findings in context, estimating CVSS scores, mapping to OWASP categories, and building a prioritized remediation roadmap.
 
 **Input**: `{ scanId }` → Fetches scan + findings from database using service role key
 
@@ -447,25 +467,27 @@ Generates comprehensive enterprise-grade AI threat intelligence reports.
 - Output format: 11-section structured markdown report:
   1. Executive Summary
   2. Scope & Methodology
-  3. Risk Assessment Overview (with risk matrix)
-  4. Critical & High-Severity Findings (with CVSS estimates, CWE/OWASP refs)
-  5. Medium & Low-Severity Findings (table format)
-  6. Attack Surface Analysis (endpoints, tech stack, dependencies, forms)
-  7. Security Headers Assessment
-  8. Infrastructure & Hosting Analysis
-  9. Remediation Roadmap (immediate → long-term)
-  10. Compliance Considerations (GDPR, PCI-DSS, SOC 2)
+  3. Critical & High-Severity Findings (with CVSS estimates, CWE/OWASP refs)
+  4. Medium & Low-Severity Findings (table format)
+  5. Attack Surface Analysis (endpoints, tech stack, dependencies, forms)
+  6. Security Headers Assessment
+  7. Infrastructure & Hosting Analysis
+  8. Remediation Roadmap (immediate → long-term)
+  9. Compliance Considerations (GDPR, PCI-DSS, SOC 2)
+  10. Risk Assessment Overview (with risk matrix)
   11. Conclusion
 
 **Post-generation**: Report is stored in the `scans.ai_report` column.
 
 **Error handling**: Returns specific error codes for rate limiting (429) and credit exhaustion (402).
 
+The threat report provides a one-shot comprehensive analysis, but users often need to ask follow-up questions or drill into specific areas. That's where the interactive AI analyst comes in.
+
 ### 4.3 AI Surface Analyst (Chatbot & Insights)
 
 **File**: `supabase/functions/analyze-surface/index.ts`
 
-Powers both the interactive AI chatbot (`AiChatPanel`) and the one-click AI analysis buttons (`AiSurfaceInsight`). Handles **7 different section types** with tailored prompts:
+Powers both the interactive AI chatbot (`AiChatPanel`) and the one-click AI analysis buttons (`AiSurfaceInsight`). Unlike the threat report generator which produces a single monolithic report, this function is designed for targeted, conversational analysis — handling **7 different section types** with tailored prompts that focus on specific aspects of the scan data:
 
 | Section | Source Component | Context Data | Analysis Focus |
 |---------|-----------------|-------------|----------------|
@@ -481,11 +503,13 @@ Powers both the interactive AI chatbot (`AiChatPanel`) and the one-click AI anal
 
 **System prompt**: Principal Cybersecurity Analyst specializing in web app security, pen testing, and threat intelligence. References OWASP, CWE, MITRE ATT&CK.
 
+Before any of these analysis functions can run, though, the domain must first be approved. The fourth and final edge function acts as the gatekeeper that decides whether a scan should proceed at all.
+
 ### 4.4 AI Domain Policy Agent
 
 **File**: `supabase/functions/evaluate-domain/index.ts`
 
-The gatekeeper function that evaluates every scan request before execution.
+The gatekeeper function that evaluates every scan request before execution. This is the first edge function called in any scan workflow — if it blocks the domain, none of the other functions ever fire.
 
 ```mermaid
 flowchart TD
@@ -516,9 +540,13 @@ flowchart TD
 
 **Policy Agent Explanation:** Every scan request passes through this gatekeeper before any crawling begins. The domain is first cleaned (lowercased, protocol and path stripped), then checked against the `domain_policies` table for an existing cached policy. If a policy exists, it's returned immediately with an audit log entry — no AI call is needed. For unknown domains, the function invokes **Gemini 2.5 Flash Lite** via the Lovable AI Gateway with a classification prompt that defines three categories: **ALLOW** (public websites, businesses, SaaS, education, open-source), **BLOCK** (military, intelligence agencies, critical infrastructure, healthcare patient portals, banking, honeypots), and **REVIEW** (ambiguous, small government, suspicious TLDs). The AI responds with a JSON object containing the policy and a human-readable reason. If the AI call fails (rate limit, network error, unparseable response), the function defaults to `review` with a descriptive error message explaining *why* it failed — e.g., "The AI evaluation service is temporarily rate-limited" or "AI evaluation encountered a network error." The policy is stored in `domain_policies` for future cache hits, and an audit log entry is created for accountability.
 
+The edge functions above reference Firecrawl API calls extensively but only at a high level. The next section zooms into the scraping process itself — the specific API endpoints, request parameters, response structures, and data extraction logic that turn a domain name into structured security data.
+
 ---
 
 ## 5. Firecrawl Web Scraping Process
+
+Firecrawl is the data acquisition engine at the heart of ThreatLens. The `firecrawl-scan` edge function uses two Firecrawl API endpoints — `/v1/scrape` for deep single-page extraction and `/v1/map` for broad site-wide URL discovery. This section details exactly what data is requested, what comes back, and how it's parsed into the structured format stored in the database.
 
 ### 5.1 Scraping Flow Diagram
 
@@ -574,13 +602,17 @@ Extracts: action URL, HTTP method, input field names (capped at 20 forms).
 
 **Security Header Analysis**: Reads from Firecrawl metadata object. Each of 7 headers is checked — present values stored, missing values marked as `"Not Set"`.
 
+Firecrawl provides the raw data, but it takes AI to turn that data into actionable intelligence. The next section covers how ThreatLens integrates with multiple AI models through a unified gateway, and why different functions use different models.
+
 ---
 
 ## 6. AI Integration
 
-All three AI-powered edge functions use the **Lovable AI Gateway** (`https://ai.gateway.lovable.dev/v1/chat/completions`) for inference. No user API keys are required — the `LOVABLE_API_KEY` environment variable is auto-provisioned by Lovable Cloud.
+All three AI-powered edge functions use the **Lovable AI Gateway** (`https://ai.gateway.lovable.dev/v1/chat/completions`) for inference. No user API keys are required — the `LOVABLE_API_KEY` environment variable is auto-provisioned by Lovable Cloud. This unified gateway approach means all AI calls follow the same OpenAI-compatible API pattern, differing only in the model selected and the prompt constructed.
 
 ### 6.1 Models Used
+
+ThreatLens employs three different Gemini models, each chosen for the specific demands of its task:
 
 | Function | Model | Reasoning |
 |----------|-------|-----------|
@@ -636,13 +668,18 @@ Edge Function
 - **402 Payment Required** — Credits exhausted; surfaces billing guidance
 - **Network/Parse errors** — Falls back gracefully with explanatory messages
 
+The backend is only half the story — all of this data and AI analysis needs to be presented to the user through an intuitive interface. The next section covers the frontend components that render scans, findings, reports, and interactive analysis into a cohesive user experience.
+
 ---
 
 ## 7. Frontend Components
 
+The React frontend is organized into seven page components and eight core components, all rendered within a shared layout that provides navigation, authentication state, and page transition animations. Each page maps to a specific step in the user workflow — from authentication to scanning to analysis to comparison — and leverages the API layer (covered in Section 13) to communicate with the backend.
+
 ### 7.1 Pages
 
 #### `Auth.tsx` — Authentication
+The entry point for all new and returning users. This page handles the full Google OAuth lifecycle:
 - Tab-based Sign In / Sign Up UI with custom tab switcher (not shadcn tabs)
 - Google OAuth via `lovable.auth.signInWithOAuth("google")`
 - `auth_intent` stored in localStorage to distinguish signup vs signin after OAuth redirect
@@ -653,6 +690,7 @@ Edge Function
 - Animated background with radial gradient
 
 #### `Index.tsx` — Dashboard
+Once authenticated, users land on the dashboard — the operational hub that provides an at-a-glance overview of scanning activity and serves as the primary entry point for new scans:
 - Animated hero section with 3 concentric pulsing radar rings (Framer Motion)
 - ThreatLens logo with pulse ring animation
 - `ScanForm` component for domain input
@@ -663,7 +701,7 @@ Edge Function
 - Technology fingerprint cloud — top 8 technologies across all scans with occurrence counts
 
 #### `ScanDetail.tsx` — Scan Results (655 lines)
-The most complex page. **Four tabs**:
+The most complex page in the application — where the bulk of scan intelligence is consumed. Users navigate here after initiating a scan or clicking a scan from the dashboard/history. It's organized into **four tabs** that separate concerns:
 
 **Header area** (always visible):
 - Domain name, status badge, scan timestamp
@@ -702,6 +740,7 @@ The most complex page. **Four tabs**:
 - Full raw crawl data displayed as formatted JSON in a scrollable `<pre>` block
 
 #### `History.tsx` — Scan History
+While the dashboard shows the 5 most recent scans, the History page provides a complete chronological view with management capabilities:
 - Chronological list of all scans
 - Each scan shows: domain, timestamp, URL count, findings count, status badge, risk score
 - Delete button with AlertDialog confirmation
@@ -709,6 +748,7 @@ The most complex page. **Four tabs**:
 - Staggered entry animations
 
 #### `Compare.tsx` — Scan Comparison
+For organizations scanning the same domain periodically, the Compare page enables delta analysis between any two completed scans:
 - Dual Select dropdowns (only completed scans)
 - Mutual exclusion (can't compare a scan with itself)
 - Parallel data loading with `Promise.all`
@@ -718,6 +758,7 @@ The most complex page. **Four tabs**:
 - **Endpoint Changes**: New Endpoints, Removed Endpoints (capped at 30 shown, with "+N more" overflow)
 
 #### `Policies.tsx` — Domain Policy Management
+This page is the human override layer on top of the AI policy agent — allowing administrators to manually approve, block, or flag domains, and review the full audit trail:
 - Stats row (4 cards): Allowed, Blocked, Under Review, AI Evaluated counts
 - Manual policy addition form: domain input, policy type selector, optional reason, Add button
 - Domain cleaning on add: lowercase, strip protocol/path
@@ -735,7 +776,10 @@ The most complex page. **Four tabs**:
 
 ### 7.2 Core Components
 
+Beyond the page components, several reusable components provide shared functionality across multiple pages. These handle everything from domain input to AI interaction to data visualization.
+
 #### `AiChatPanel.tsx`
+The interactive AI analyst interface that appears on the ScanDetail page — providing conversational access to the `analyze-surface` edge function:
 - Collapsible chat interface — starts as a button, expands to full card panel
 - Three context modes: `surface`, `findings`, `raw_data` with distinct labels
 - Suggested question chips (4 per context) for quick one-click analysis
@@ -755,12 +799,13 @@ The most complex page. **Four tabs**:
 - Loading state with "Analyzing..." spinner
 
 #### `AiSurfaceInsight.tsx`
-- One-click AI analysis button for specific surface sections
+Complements the chatbot with one-click AI analysis for specific attack surface sections:
 - Supports 4 section types: `security_headers`, `endpoints`, `dependencies`, `raw_data`
 - Renders analysis results inline with basic markdown parsing (headers, bold, bullets, numbered lists)
 - Calls `onAnalysis` callback to pass results up to ScanDetail for PDF inclusion
 
 #### `ScanForm.tsx`
+The domain input component used on both the Dashboard and (implicitly) in the scan workflow:
 - Domain input with Globe icon prefix
 - Two-phase submit flow:
   1. `evaluateDomain()` — checks AI policy agent
@@ -770,11 +815,13 @@ The most complex page. **Four tabs**:
 - Navigates to `/scan/{scanId}` on success
 
 #### `AuthProvider.tsx`
+The authentication context that wraps the entire application:
 - React context providing `session`, `loading`, and `signOut`
 - Sets up `onAuthStateChange` listener **before** calling `getSession()` (proper Supabase pattern to avoid race conditions)
 - Provides context to entire app via `useAuth()` hook
 
 #### `RiskScoreBreakdown.tsx`
+A detailed visualization of how a scan's risk score was calculated:
 - Large score display with color-coded text (Critical/High/Medium/Low)
 - Progress bar visualization with animated width
 - **Bar chart**: Severity contributions as proportional vertical bars with raw point labels
@@ -789,6 +836,7 @@ The most complex page. **Four tabs**:
 3. **StatusBadge**: Scan status label (pending/crawling/analyzing/completed/failed) with `animate-pulse-glow` for active states
 
 #### `PageTransition.tsx`
+Provides smooth visual transitions between pages using Framer Motion:
 - `PageTransition` component: AnimatePresence wrapper with fade + slide animations (0.25s, custom easing)
 - Exported animation variants:
   - `staggerContainer`: Staggers children by 0.06s
@@ -814,9 +862,13 @@ Built on **shadcn/ui** with Radix primitives. Key components actively used:
 - `Avatar`, `AvatarImage`, `AvatarFallback` — user profile display with initial fallback
 - `Progress` — risk score bars (used in RiskScoreBreakdown)
 
+The frontend components above rely on an authenticated session to function — the `AuthProvider` context, the `ProtectedRoute` wrapper, and the profile-based registration gate all work together to ensure only registered users can access the platform. The next section dives deeper into exactly how that authentication system works end-to-end.
+
 ---
 
 ## 8. Authentication System
+
+Authentication is the first thing a user encounters and the last line of defense against unauthorized access. ThreatLens uses Google OAuth through Lovable Cloud, but adds a custom **profile-based registration gate** on top — meaning that having a Google account alone isn't enough to access the platform. Users must explicitly sign up, which creates a `profiles` row, before they can sign in on subsequent visits.
 
 ### 8.1 Auth Flow Diagram
 
@@ -856,9 +908,13 @@ flowchart TD
 - User avatar + email shown in header Popover (from `session.user.user_metadata`)
 - Loading spinner shown while auth state is being determined
 
+Once authenticated, users interact with scan results — and the most prominent metric they encounter is the risk score. The next section explains exactly how that score is calculated from individual findings.
+
 ---
 
 ## 9. Risk Scoring Algorithm
+
+Every completed scan produces a single composite risk score between 0 and 100. This score serves as the primary metric across the platform — it's displayed on the dashboard, in scan history, on the detail page, in comparisons, and in PDF reports. The algorithm is intentionally simple and transparent, so users can understand exactly why a domain received its score.
 
 ### Scoring Formula
 
@@ -898,13 +954,17 @@ flowchart LR
 
 Average risk is calculated only from **completed** scans with non-null `risk_score`, excluding failed or in-progress scans that would skew the metric downward.
 
+Risk scores, findings, and AI analysis are all valuable in the browser — but security professionals often need to share results with stakeholders who don't have platform access. That's where the PDF export engine comes in.
+
 ---
 
 ## 10. PDF Export Engine
 
 **File**: `src/lib/pdf-export.ts`
 
-Generates professional PDF reports using jsPDF with the following structure:
+The PDF export engine transforms a scan's complete intelligence — findings, risk scores, AI reports, and surface analysis — into a professional, branded document suitable for executive briefings, compliance audits, and client deliverables. It runs entirely client-side using jsPDF, requiring no backend involvement.
+
+The generated report follows this structure:
 
 1. **Cover Page** — Dark background (`rgb(15,17,23)`), "THREAT INTELLIGENCE ASSESSMENT REPORT" title, purple accent line, domain, date, report ID (`TL-{scanId.slice(0,8)}`), risk score, finding count, URL count, "CLASSIFICATION: CONFIDENTIAL" label
 2. **Findings Summary** — Severity table (count × weight = points per severity), total risk score, detailed finding cards with colored severity badges (`roundedRect`), category labels, descriptions with text wrapping
@@ -919,9 +979,13 @@ Generates professional PDF reports using jsPDF with the following structure:
 - Page numbering excludes cover page (Page 1 of N starts on findings page)
 - Dynamic file naming: `ThreatLens_Report_{sanitized_domain}_{date}.pdf`
 
+The PDF report mirrors the visual language of the application itself — the same dark background, purple accents, and severity color coding. That visual consistency is powered by a comprehensive design system, which the next section documents in full.
+
 ---
 
 ## 11. Design System & Styling
+
+ThreatLens's visual identity is built on a dark-mode-only design system with cybersecurity-themed aesthetics — deep navy backgrounds, purple primary accents, teal secondary accents, and severity-coded colors that carry consistent meaning across every component. All styling is implemented through CSS custom properties (design tokens) consumed by Tailwind utility classes, ensuring that visual changes propagate globally from a single source of truth.
 
 ### 11.1 CSS Token Architecture
 
@@ -947,6 +1011,8 @@ All colors use HSL values defined in `src/index.css`. The app is **dark-mode onl
 
 ### 11.2 Custom Utilities
 
+Beyond the standard Tailwind utilities, several custom CSS classes provide the platform's signature visual effects:
+
 | Utility Class | Effect |
 |--------------|--------|
 | `.glass` | Glassmorphism: `background: hsl(card / 0.7)` + `backdrop-filter: blur(20px)` — used on sticky header |
@@ -965,9 +1031,13 @@ All colors use HSL values defined in `src/index.css`. The app is **dark-mode onl
 - Font feature settings: `ss01`, `ss02` enabled for enhanced character shapes
 - Custom scrollbar: 5px width, `--border`-colored thumb, transparent track, rounded corners
 
+A beautiful interface is meaningless without proper security controls. The design system ensures visual consistency, but the security architecture ensures data integrity and access control — which is what the next section covers.
+
 ---
 
 ## 12. Security Architecture
+
+Security in ThreatLens operates at two levels: **data-level security** through Row Level Security policies on the database, and **application-level security** through the AI domain policy agent and edge function access controls. Together, they ensure that users can only access their own profile data, that scan data is shared transparently, and that the scanning capabilities themselves cannot be weaponized against sensitive targets.
 
 ### Row Level Security (RLS)
 
@@ -984,7 +1054,7 @@ All colors use HSL values defined in `src/index.css`. The app is **dark-mode onl
 
 ### Domain Policy Agent Security
 
-The AI policy agent enforces responsible use:
+The AI policy agent enforces responsible use at the application level:
 - **Blocked categories**: Military (.mil), intelligence agencies, critical infrastructure, healthcare patient portals, core banking systems, law enforcement honeypots
 - **Auto-allowed**: Public websites, businesses, SaaS products, educational institutions, open-source projects, news sites, personal sites
 - **Flagged for review**: Ambiguous or potentially sensitive targets, small government agencies, suspicious TLDs, private-looking internal domains
@@ -1000,13 +1070,15 @@ The AI policy agent enforces responsible use:
 - `evaluate-domain` uses `SUPABASE_SERVICE_ROLE_KEY` for database writes + `LOVABLE_API_KEY` for AI
 - `analyze-threats` and `analyze-surface` use `LOVABLE_API_KEY` for AI gateway access
 
+The security architecture protects the backend, but the frontend also needs a clean abstraction to interact with it. The API layer provides that bridge — translating user actions into database queries and edge function invocations.
+
 ---
 
 ## 13. API Layer
 
 **File**: `src/lib/api.ts`
 
-Client-side API abstraction layer. All functions use the Supabase JS client.
+The API layer is the single point of contact between the React frontend and the Lovable Cloud backend. Rather than scattering Supabase calls throughout page components, all data operations are centralized in this module — making it easy to trace data flow, modify query logic, and maintain type safety across the application.
 
 | Function | Purpose | Backend |
 |----------|---------|---------|
@@ -1020,6 +1092,8 @@ Client-side API abstraction layer. All functions use the Supabase JS client.
 | `deleteScan(id)` | Delete scan + cascading findings | Direct DB (2 deletes: findings then scan) |
 
 **TypeScript interfaces**: `Scan` and `Finding` types defined locally in `api.ts` (not using auto-generated Supabase types) to allow flexible typing of JSONB fields (`raw_crawl_data`, `parsed_data`, `enrichment`, `details` typed as `any`).
+
+This API layer completes the full-stack picture — from the database schema (Section 3) through edge functions (Section 4) to the frontend components (Section 7) and now the client-side abstraction that ties them together.
 
 ---
 
