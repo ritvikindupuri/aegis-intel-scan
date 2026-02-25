@@ -52,29 +52,21 @@ serve(async (req) => {
 
     console.log('Starting Firecrawl scrape for:', targetUrl);
 
-    // Scrape the main page
-    const scrapeResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: targetUrl,
-        formats: ['markdown', 'html', 'links'],
-        onlyMainContent: false,
-      }),
-    });
+    // Scrape the main page (with retry for transient provider tunnel/proxy failures)
+    const scrapeResult = await scrapeWithRetry(apiKey, targetUrl);
+    const scrapeData = scrapeResult.data;
 
-    const scrapeData = await scrapeResp.json();
-
-    if (!scrapeResp.ok) {
+    if (!scrapeResult.ok) {
       console.error('Firecrawl scrape error:', scrapeData);
       await supabase.from('scans').update({
         status: 'failed',
-        error_message: scrapeData.error || 'Firecrawl scrape failed',
+        error_message: scrapeData?.error || 'Firecrawl scrape failed',
       }).eq('id', currentScanId);
-      return new Response(JSON.stringify({ success: false, scanId: currentScanId, error: scrapeData.error || 'Firecrawl scrape failed' }), {
+      return new Response(JSON.stringify({
+        success: false,
+        scanId: currentScanId,
+        error: scrapeData?.error || 'Firecrawl scrape failed',
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -188,6 +180,55 @@ serve(async (req) => {
     });
   }
 });
+
+async function scrapeWithRetry(apiKey: string, targetUrl: string, maxAttempts = 2) {
+  let lastStatus = 500;
+  let lastData: any = { error: 'Unknown scrape error' };
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const scrapeResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: targetUrl,
+        formats: ['markdown', 'html', 'links'],
+        onlyMainContent: false,
+      }),
+    });
+
+    let scrapeData: any;
+    try {
+      scrapeData = await scrapeResp.json();
+    } catch {
+      scrapeData = { error: 'Invalid response from crawl provider' };
+    }
+
+    if (scrapeResp.ok) {
+      return { ok: true, status: scrapeResp.status, data: scrapeData };
+    }
+
+    lastStatus = scrapeResp.status;
+    lastData = scrapeData;
+
+    const message = `${scrapeData?.error || ''} ${scrapeData?.code || ''}`.toLowerCase();
+    const isRetryable =
+      message.includes('err_tunnel_connection_failed') ||
+      message.includes('proxy error') ||
+      message.includes('timed out') ||
+      message.includes('temporarily unavailable');
+
+    if (!isRetryable || attempt === maxAttempts) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
+
+  return { ok: false, status: lastStatus, data: lastData };
+}
 
 function detectTechnologies(html: string): string[] {
   const techs: string[] = [];
