@@ -103,70 +103,56 @@ The platform features an AI domain policy agent that prevents misuse by automati
 
 ## System Architecture
 
+```mermaid
+graph TB
+    subgraph Client["CLIENT - React + Vite"]
+        Dashboard["Dashboard\n(Index)"]
+        ScanDetail["Scan\nDetail"]
+        History["History\nCompare"]
+        Policies["Policies\nAudit Log"]
+        Dashboard --> SBClient
+        ScanDetail --> SBClient
+        History --> SBClient
+        Policies --> SBClient
+        SBClient["Supabase JS Client"]
+    end
+
+    SBClient --> Backend
+
+    subgraph Backend["LOVABLE CLOUD"]
+        DB["PostgreSQL\nscans | findings | profiles\npolicies | audit_log"]
+        EF["Edge Functions"]
+        Auth["Auth - Google OAuth"]
+        EF --> DB
+        Auth --> DB
+    end
+
+    subgraph External["EXTERNAL SERVICES"]
+        Firecrawl["Firecrawl API\nWeb Scraping"]
+        AI["Lovable AI Gateway\nGemini Pro / Flash / Flash Lite"]
+        Google["Google OAuth\nIdentity Provider"]
+    end
+
+    EF --> Firecrawl
+    EF --> AI
+    Auth --> Google
 ```
-+------------------------------------------------------------------+
-|                      CLIENT (React + Vite)                        |
-|                                                                    |
-|  +----------+  +----------+  +----------+  +----------------+     |
-|  |Dashboard |  |Scan      |  |History   |  |Policies        |     |
-|  |  Index   |  |  Detail  |  |  Compare |  |  Audit Log     |     |
-|  +----+-----+  +----+-----+  +----+-----+  +-------+--------+     |
-|       |              |              |               |              |
-|       +--------------+--------------+---------------+              |
-|                              |                                     |
-|                    Supabase JS Client                              |
-+------------------------------+-------------------------------------+
-                               |
-                    +----------v----------+
-                    |   Lovable Cloud     |
-                    |   (Supabase)        |
-                    |                     |
-                    |  +---------------+  |
-                    |  |  PostgreSQL   |  |
-                    |  |  - scans      |  |
-                    |  |  - findings   |  |
-                    |  |  - profiles   |  |
-                    |  |  - policies   |  |
-                    |  |  - audit_log  |  |
-                    |  +---------------+  |
-                    |                     |
-                    |  +---------------+  |
-                    |  |Edge Functions |  |
-                    |  |  - firecrawl  |  |
-                    |  |  - analyze    |  |
-                    |  |  - evaluate   |  |
-                    |  |  - surface    |  |
-                    |  +-------+-------+  |
-                    |          |          |
-                    |  +-------v-------+  |
-                    |  |  Auth (OAuth) |  |
-                    |  |  Google SSO   |  |
-                    |  +---------------+  |
-                    +----------+----------+
-                               |
-              +----------------+----------------+
-              |                |                |
-     +--------v------+ +------v------+ +-------v------+
-     | Firecrawl API | | Lovable AI  | | Google OAuth  |
-     | Web Scraping  | | Gemini/GPT  | | Identity     |
-     +---------------+ +-------------+ +--------------+
-```
+
+<p align="center"><em>Figure 1 — ThreatLens System Architecture Overview</em></p>
 
 ### Architecture Explanation
 
-**Client Layer**: A single-page React application built with Vite, using React Router for navigation across Dashboard, Scan Detail, History, Compare, and Policies pages. All API communication flows through the Supabase JS client.
-
-**Backend Layer (Lovable Cloud)**: A managed backend providing PostgreSQL for data persistence, Edge Functions for serverless compute, and OAuth for authentication. Row Level Security (RLS) policies protect user data on the profiles table.
+The diagram above illustrates the three-tier architecture of ThreatLens. Data flows from the **Client Layer** (a single-page React application) through the **Supabase JS Client**, which communicates with the **Lovable Cloud Backend**. The backend consists of a PostgreSQL database for persistence, four serverless Edge Functions for compute, and an OAuth authentication layer. The Edge Functions reach out to **External Services** — Firecrawl for web scraping, the Lovable AI Gateway for multi-model AI inference, and Google for identity verification. This separation ensures the client never directly touches external APIs or database internals, and all sensitive operations (API keys, AI inference, data writes) happen server-side.
 
 **Edge Functions**:
 - `firecrawl-scan` — Orchestrates the full scan pipeline: crawling, parsing, finding generation, and risk scoring
-- `analyze-threats` — Generates comprehensive AI threat reports from scan data using Gemini
+- `analyze-threats` — Generates comprehensive AI threat reports from scan data using Gemini Pro
 - `analyze-surface` — Powers the interactive AI analyst chatbot with context-specific prompts
 - `evaluate-domain` — AI domain policy agent that gates scan requests before execution
 
 **External Services**:
 - **Firecrawl API** — Web scraping (scrape endpoint) and site mapping (map endpoint)
-- **Lovable AI** — Multi-model AI inference (Gemini Flash, Gemini Flash Lite) for threat analysis
+- **Lovable AI Gateway** — Multi-model AI inference (Gemini Pro, Gemini Flash, Gemini Flash Lite) for threat analysis
 - **Google OAuth** — User authentication via managed SSO
 
 ---
@@ -239,10 +225,6 @@ For comprehensive technical documentation covering every component, system flow,
 
 ## Conclusion
 
-ThreatLens demonstrates how modern AI capabilities can be combined with automated web reconnaissance to create a practical, accessible threat intelligence platform. By integrating Firecrawl's web scraping with multi-model AI analysis (Gemini Flash for domain policy evaluation, Gemini Pro for deep threat analysis), the platform delivers actionable security insights that would traditionally require hours of manual penetration testing work.
+ThreatLens demonstrates how modern AI capabilities can be combined with automated web reconnaissance to create a practical, accessible threat intelligence platform. By integrating Firecrawl's web scraping with multi-model AI analysis (Gemini Flash Lite for domain policy evaluation, Gemini Flash for interactive analysis, Gemini Pro for deep threat reports), the platform delivers actionable security insights that would traditionally require hours of manual penetration testing work.
 
 The AI domain policy agent adds a critical layer of responsible use — ensuring the scanning capabilities cannot be weaponized against sensitive targets while maintaining ease of use for legitimate security assessments. The combination of automated detection, interactive AI analysis, and professional reporting makes ThreatLens a comprehensive tool for security professionals and organizations looking to understand and reduce their attack surface.
-
----
-
-*Built with [Lovable](https://lovable.dev)*
