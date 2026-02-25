@@ -41,7 +41,13 @@ export async function startScan(domain: string): Promise<{ scanId: string }> {
   const { data, error } = await supabase.functions.invoke('firecrawl-scan', {
     body: { domain },
   });
-  if (error) throw new Error(error.message);
+
+  if (error) {
+    const recoveredScanId = error.message.match(/"scanId":"([a-f0-9-]+)"/i)?.[1];
+    if (recoveredScanId) return { scanId: recoveredScanId };
+    throw new Error(error.message);
+  }
+
   // If crawl failed but we have a scanId, return it so user can see the failed state
   if (data?.scanId) return { scanId: data.scanId };
   if (data?.error) throw new Error(data.error);

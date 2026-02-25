@@ -15,6 +15,8 @@ serve(async (req) => {
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  let currentScanId: string | undefined;
+
   try {
     const { domain, scanId } = await req.json();
     if (!domain) {
@@ -31,7 +33,7 @@ serve(async (req) => {
     }
 
     // Create or use existing scan record
-    let currentScanId = scanId;
+    currentScanId = scanId;
     if (!currentScanId) {
       const { data: scan, error: insertErr } = await supabase
         .from('scans')
@@ -173,6 +175,22 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Scan error:', error);
+
+    if (currentScanId) {
+      await supabase.from('scans').update({
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Crawl failed',
+      }).eq('id', currentScanId);
+
+      return new Response(JSON.stringify({
+        success: false,
+        scanId: currentScanId,
+        error: error instanceof Error ? error.message : 'Crawl failed',
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : 'Unknown error'
     }), {
@@ -186,18 +204,32 @@ async function scrapeWithRetry(apiKey: string, targetUrl: string, maxAttempts = 
   let lastData: any = { error: 'Unknown scrape error' };
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const scrapeResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: targetUrl,
-        formats: ['markdown', 'html', 'links'],
-        onlyMainContent: false,
-      }),
-    });
+    let scrapeResp: Response;
+
+    try {
+      scrapeResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: targetUrl,
+          formats: ['markdown', 'html', 'links'],
+          onlyMainContent: false,
+        }),
+      });
+    } catch (fetchError) {
+      lastStatus = 503;
+      lastData = { error: fetchError instanceof Error ? fetchError.message : 'Network error calling crawl provider' };
+
+      if (attempt === maxAttempts) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      continue;
+    }
 
     let scrapeData: any;
     try {
