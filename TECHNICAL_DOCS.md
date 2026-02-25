@@ -127,7 +127,7 @@ flowchart TD
    - **Endpoint extraction**: URLs are deduplicated, capped at 500, and filtered for JavaScript files, external dependencies (different hostname), and API-like endpoint patterns.
    - **Technology detection**: 20 regex patterns are matched against the raw HTML to identify frameworks, CDNs, CMSs, and analytics tools.
    - **Security header analysis**: 7 critical headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy) are checked from response metadata.
-   - **Enrichment generation**: Simulated WHOIS data, hosting provider detection, and risk factor assessment are produced.
+   - **Enrichment generation**: Real WHOIS data is fetched via RDAP (Registration Data Access Protocol) and IP geolocation via ip-api.com. Risk factors are computed from detected technologies and URL count.
 7. **Finding Generation** — The parsed data feeds into six finding categories: security header gaps, sensitive exposed paths (e.g., `/admin`, `/.env`, `/.git`), suspicious query parameters (e.g., `redirect`, `cmd`, `exec`), XSS input points (e.g., search/comment forms), technology risks (e.g., jQuery, WordPress), and supply chain vulnerabilities (excessive external dependencies).
 8. **Risk Scoring** — Each finding is assigned a severity (critical/high/medium/low/info), and a composite risk score is calculated from the weighted sum: Critical = 25pts, High = 15pts, Medium = 8pts, Low = 3pts, Info = 1pt. The total is capped at 100.
 9. **Database Persistence** — The scan record (with parsed data, technologies, enrichment) and all findings are written to the `scans` and `findings` PostgreSQL tables.
@@ -409,7 +409,7 @@ flowchart TD
    - **External Dependency Filtering** — Compares each URL's hostname against the target domain; different hostnames are classified as external dependencies (capped at 100).
    - **Endpoint Filtering** — Identifies URLs containing query parameters (`?`) or matching API-like patterns (`/api/`, `/graphql/`, `/v1/`, `/admin/`, etc.).
    - **`analyzeSecurityFromMeta()`** — Checks the Firecrawl metadata object for 7 security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, and Permissions-Policy. Present values are stored; missing values are marked as `"Not Set"`.
-   - **Enrichment Generation** — Produces simulated WHOIS data (registrar, creation date), hosting provider detection (based on IP/CDN patterns), and risk factor assessment.
+   - **Real Enrichment Generation** — Fetches live WHOIS data via RDAP (`https://rdap.org/domain/`) and IP geolocation via ip-api.com (`http://ip-api.com/json/`). Returns registrar, registration/expiry dates, nameservers, status flags, ISP, ASN, country, city, and organization. Risk factors (hasLogin, isEcommerce, usesCDN, surfaceSize) are computed from detected technologies and URL count.
 8. **Status Update** — The scan record is updated to `status: analyzing` with all parsed data stored in the `parsed_data`, `technologies`, and `enrichment` JSONB columns.
 9. **Finding Generation** — The `generateFindings()` function runs six categories of security checks against the parsed data (see Finding Generation Categories table below). Each check produces zero or more findings with a title, description, severity, category, and details object.
 10. **Database Insertion** — All generated findings are batch-inserted into the `findings` table with the scan's `scan_id` as the foreign key.
@@ -502,6 +502,49 @@ const links = [...new Set([...scrapeLinks, ...mapLinks])].sort();
 This ensures that even if Firecrawl returns URLs in a different order between runs (due to internal concurrency, CDN routing, or server-side randomization), the downstream slicing (`urls.slice(0, 500)`, `endpoints.slice(0, 100)`, etc.) always selects the same subset of URLs. Without sorting, two scans of the same domain could process different URL subsets, leading to different findings simply because the array order changed.
 
 **Combined Effect**: These three mechanisms work together to minimize variance between scans of the same domain. The remaining sources of variance (dynamic site content, A/B testing, CDN geo-routing, bot detection) are inherent to web scraping and cannot be eliminated from the client side.
+
+#### Per-User Rate Limiting
+
+Every scan request is subject to a per-user daily quota to prevent Firecrawl credit exhaustion. The system uses a `scan_quotas` table to track usage:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `user_id` | UUID (UNIQUE) | The authenticated user |
+| `scans_today` | INTEGER | Number of scans performed today |
+| `daily_limit` | INTEGER | Configurable daily cap (default: 10) |
+| `last_scan_date` | DATE | Date of last scan (for daily reset) |
+
+**Rate limiting flow:**
+
+1. **Extract user identity** — The edge function extracts the user ID from the `Authorization` header using the anon key to verify the JWT token.
+2. **Check or create quota** — If no quota record exists, one is created with `scans_today: 1`. If the record exists but `last_scan_date` is not today, the counter resets to 1.
+3. **Enforce limit** — If `scans_today >= daily_limit`, the function returns HTTP 429 with a descriptive error message including the limit and reset time.
+4. **Increment counter** — On successful quota check, `scans_today` is incremented before the scan proceeds.
+5. **Frontend display** — The `ScanForm` component displays a quota indicator (`X/10 scans used today`) and shows a "Limit reached" warning when exhausted.
+
+Administrators can adjust per-user limits by updating the `daily_limit` column in the `scan_quotas` table directly.
+
+#### Real Enrichment Data
+
+All domain enrichment data is sourced from live external APIs — **no simulated or mocked data** exists in the application.
+
+**RDAP (Registration Data Access Protocol)** — Modern replacement for WHOIS:
+- Endpoint: `https://rdap.org/domain/{domain}`
+- Returns: Registrar name, registration date, expiry date, last-changed date, nameservers, domain status flags
+- Extracted from the RDAP JSON response structure (entities with `registrar` role, event actions for dates)
+
+**IP Geolocation (ip-api.com)** — Free IP intelligence:
+- Endpoint: `http://ip-api.com/json/{domain}`
+- Returns: Resolved IP address, ISP, organization, ASN (number + name), country, region, city
+- Accepts domain names directly (handles DNS resolution server-side)
+
+**Risk Factors** — Computed locally from scan data:
+- `hasLogin`: Detected if WordPress, Shopify, or Drupal are present
+- `isEcommerce`: Detected if Shopify, Stripe, or Wix are present
+- `usesCDN`: Detected if Cloudflare is present
+- `surfaceSize`: Classified as `small` (<30 URLs), `medium` (30-100), or `large` (>100)
+
+Both external API calls are wrapped in try-catch blocks with graceful fallback — if RDAP or ip-api.com is unreachable, the enrichment object still returns with an `error` field and `source` identifier, preventing scan pipeline failures.
 
 Once the scan pipeline completes and findings are stored, users can request deeper analysis. The next two edge functions handle that — generating comprehensive AI reports and powering the interactive chatbot.
 

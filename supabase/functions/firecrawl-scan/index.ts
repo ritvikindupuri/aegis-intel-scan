@@ -32,6 +32,67 @@ serve(async (req) => {
       });
     }
 
+    // --- Per-user rate limiting ---
+    const authHeader = req.headers.get('authorization');
+    let userId: string | null = null;
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      userId = user?.id || null;
+    }
+
+    if (userId) {
+      const today = new Date().toISOString().split('T')[0];
+
+      // Get or create quota record
+      const { data: quota } = await supabase
+        .from('scan_quotas')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!quota) {
+        // First scan ever — create quota record
+        await supabase.from('scan_quotas').insert({
+          user_id: userId,
+          scans_today: 1,
+          daily_limit: 10,
+          last_scan_date: today,
+        });
+      } else {
+        const quotaDate = quota.last_scan_date;
+        if (quotaDate !== today) {
+          // New day — reset counter
+          await supabase.from('scan_quotas').update({
+            scans_today: 1,
+            last_scan_date: today,
+            updated_at: new Date().toISOString(),
+          }).eq('user_id', userId);
+        } else {
+          // Same day — check limit
+          if (quota.scans_today >= quota.daily_limit) {
+            return new Response(JSON.stringify({
+              error: `Daily scan limit reached (${quota.daily_limit} scans/day). Your quota resets at midnight UTC.`,
+              rateLimited: true,
+              scansToday: quota.scans_today,
+              dailyLimit: quota.daily_limit,
+            }), {
+              status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          // Increment counter
+          await supabase.from('scan_quotas').update({
+            scans_today: quota.scans_today + 1,
+            updated_at: new Date().toISOString(),
+          }).eq('user_id', userId);
+        }
+      }
+    }
+
     // Create or use existing scan record
     currentScanId = scanId;
     if (!currentScanId) {
@@ -133,8 +194,9 @@ serve(async (req) => {
       securityHeaders,
     };
 
-    // Generate enrichment data (simulated for WHOIS, ASN, etc.)
-    const enrichment = generateEnrichment(domain, technologies, links.length);
+    // Generate real enrichment data (RDAP + IP geolocation)
+    const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const enrichment = await generateRealEnrichment(cleanDomain, technologies, links.length);
 
     // Update scan with crawl results
     await supabase.from('scans').update({
@@ -269,6 +331,111 @@ async function scrapeWithRetry(apiKey: string, targetUrl: string, maxAttempts = 
   return { ok: false, status: lastStatus, data: lastData };
 }
 
+// --- Real enrichment using RDAP + ip-api.com ---
+
+async function generateRealEnrichment(domain: string, technologies: string[], urlCount: number) {
+  const [whois, hosting] = await Promise.all([
+    fetchRdapWhois(domain),
+    fetchIpGeolocation(domain),
+  ]);
+
+  return {
+    whois,
+    hosting,
+    riskFactors: {
+      hasLogin: technologies.some(t => ['WordPress', 'Shopify', 'Drupal'].includes(t)),
+      isEcommerce: technologies.some(t => ['Shopify', 'Stripe', 'Wix'].includes(t)),
+      usesCDN: technologies.includes('Cloudflare'),
+      surfaceSize: urlCount > 100 ? 'large' : urlCount > 30 ? 'medium' : 'small',
+    },
+  };
+}
+
+async function fetchRdapWhois(domain: string): Promise<Record<string, any>> {
+  try {
+    // Use RDAP (Registration Data Access Protocol) — the modern replacement for WHOIS
+    const resp = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, {
+      headers: { 'Accept': 'application/rdap+json' },
+    });
+
+    if (!resp.ok) {
+      console.warn('RDAP lookup failed:', resp.status);
+      return { domain, error: `RDAP lookup failed (HTTP ${resp.status})`, source: 'rdap' };
+    }
+
+    const data = await resp.json();
+
+    // Extract registrar
+    const registrarEntity = (data.entities || []).find((e: any) =>
+      (e.roles || []).includes('registrar')
+    );
+    const registrar = registrarEntity?.vcardArray?.[1]?.find(
+      (v: any) => v[0] === 'fn'
+    )?.[3] || registrarEntity?.handle || 'Unknown';
+
+    // Extract dates from events
+    const events = data.events || [];
+    const registrationEvent = events.find((e: any) => e.eventAction === 'registration');
+    const expirationEvent = events.find((e: any) => e.eventAction === 'expiration');
+    const lastChangedEvent = events.find((e: any) => e.eventAction === 'last changed');
+
+    // Extract nameservers
+    const nameservers = (data.nameservers || []).map((ns: any) => ns.ldhName || ns.handle).filter(Boolean);
+
+    // Extract status flags
+    const status = data.status || [];
+
+    return {
+      domain: data.ldhName || domain,
+      registrar,
+      createdDate: registrationEvent?.eventDate || null,
+      expiresDate: expirationEvent?.eventDate || null,
+      lastChanged: lastChangedEvent?.eventDate || null,
+      nameServers: nameservers,
+      status,
+      source: 'rdap',
+    };
+  } catch (e) {
+    console.error('RDAP lookup error:', e);
+    return { domain, error: 'RDAP lookup failed', source: 'rdap' };
+  }
+}
+
+async function fetchIpGeolocation(domain: string): Promise<Record<string, any>> {
+  try {
+    // First resolve domain to IP, then get geolocation
+    // ip-api.com accepts domain names directly
+    const resp = await fetch(`http://ip-api.com/json/${encodeURIComponent(domain)}?fields=status,message,country,countryCode,region,city,zip,lat,lon,isp,org,as,asname,query`);
+
+    if (!resp.ok) {
+      console.warn('IP geolocation lookup failed:', resp.status);
+      return { error: `Geolocation lookup failed (HTTP ${resp.status})`, source: 'ip-api' };
+    }
+
+    const data = await resp.json();
+
+    if (data.status === 'fail') {
+      return { error: data.message || 'Geolocation lookup failed', source: 'ip-api' };
+    }
+
+    return {
+      ip: data.query,
+      provider: data.isp || data.org || 'Unknown',
+      organization: data.org || null,
+      asn: data.as || null,
+      asnName: data.asname || null,
+      country: data.country || null,
+      countryCode: data.countryCode || null,
+      region: data.region || null,
+      city: data.city || null,
+      source: 'ip-api',
+    };
+  } catch (e) {
+    console.error('IP geolocation error:', e);
+    return { error: 'Geolocation lookup failed', source: 'ip-api' };
+  }
+}
+
 function detectTechnologies(html: string): string[] {
   const techs: string[] = [];
   const patterns: Record<string, RegExp> = {
@@ -324,30 +491,6 @@ function analyzeSecurityFromMeta(metadata: any): Record<string, string> {
     'X-XSS-Protection': metadata['x-xss-protection'] || 'Not Set',
     'Referrer-Policy': metadata['referrer-policy'] || 'Not Set',
     'Permissions-Policy': metadata['permissions-policy'] || 'Not Set',
-  };
-}
-
-function generateEnrichment(domain: string, technologies: string[], urlCount: number) {
-  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-  return {
-    whois: {
-      domain: cleanDomain,
-      registrar: 'Simulated Registrar Inc.',
-      createdDate: '2020-01-15',
-      expiresDate: '2026-01-15',
-      nameServers: [`ns1.${cleanDomain}`, `ns2.${cleanDomain}`],
-    },
-    hosting: {
-      provider: technologies.includes('Cloudflare') ? 'Cloudflare' : 'AWS',
-      asn: 'AS13335',
-      country: 'US',
-    },
-    riskFactors: {
-      hasLogin: technologies.some(t => ['WordPress', 'Shopify', 'Drupal'].includes(t)),
-      isEcommerce: technologies.some(t => ['Shopify', 'Stripe', 'Wix'].includes(t)),
-      usesCDN: technologies.includes('Cloudflare'),
-      surfaceSize: urlCount > 100 ? 'large' : urlCount > 30 ? 'medium' : 'small',
-    },
   };
 }
 
