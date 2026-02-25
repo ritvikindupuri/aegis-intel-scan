@@ -138,7 +138,7 @@ For comprehensive technical documentation covering every system flow, database s
 
 ## Live Demo
 
-View the live application here: **[https://threatinteligence.netlify.app/auth](https://threatinteligence.netlify.app/auth)**
+View the live application here: **[https://threatintellig.netlify.app/auth](https://threatintellig.netlify.app/auth)**
 
 ---
 
