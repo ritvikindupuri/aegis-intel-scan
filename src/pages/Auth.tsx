@@ -79,12 +79,30 @@ const Auth = () => {
   const handleGoogle = async (authMode: AuthMode) => {
     setLoading(true);
     try {
-      const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth`,
-      });
-      if (error) {
-        toast({ title: "Authentication failed", description: error.message, variant: "destructive" });
-        setLoading(false);
+      const isCustomDomain =
+        !window.location.hostname.includes("lovable.app") &&
+        !window.location.hostname.includes("lovableproject.com");
+
+      if (isCustomDomain) {
+        // On custom domains (Netlify), bypass auth-bridge and redirect manually
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth`,
+            skipBrowserRedirect: true,
+          },
+        });
+        if (error) throw error;
+        if (data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+      } else {
+        // On Lovable domains, use managed auth-bridge
+        const { error } = await lovable.auth.signInWithOAuth("google", {
+          redirect_uri: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
       }
     } catch (err: any) {
       toast({ title: "Authentication failed", description: err.message, variant: "destructive" });
