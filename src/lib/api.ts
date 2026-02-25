@@ -43,7 +43,6 @@ export async function startScan(domain: string): Promise<{ scanId: string }> {
   });
 
   if (error) {
-    // Check for rate limiting
     if (error.message?.includes('Daily scan limit')) {
       throw new Error(error.message);
     }
@@ -56,7 +55,6 @@ export async function startScan(domain: string): Promise<{ scanId: string }> {
     throw new Error(data.error || 'Daily scan limit reached');
   }
 
-  // If crawl failed but we have a scanId, return it so user can see the failed state
   if (data?.scanId) return { scanId: data.scanId };
   if (data?.error) throw new Error(data.error);
   return { scanId: data.scanId };
@@ -130,7 +128,6 @@ export async function getFindings(scanId: string): Promise<Finding[]> {
 }
 
 export async function deleteScan(id: string): Promise<void> {
-  // Delete findings first (foreign key constraint)
   const { error: findingsError } = await supabase
     .from('findings')
     .delete()
@@ -142,4 +139,144 @@ export async function deleteScan(id: string): Promise<void> {
     .delete()
     .eq('id', id);
   if (error) throw error;
+}
+
+// --- Scan Schedules ---
+
+export interface ScanSchedule {
+  id: string;
+  domain: string;
+  frequency: string;
+  enabled: boolean;
+  last_scan_id: string | null;
+  last_run_at: string | null;
+  next_run_at: string;
+  created_at: string;
+}
+
+export async function getScanSchedules(): Promise<ScanSchedule[]> {
+  const { data, error } = await supabase
+    .from('scan_schedules')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as ScanSchedule[];
+}
+
+export async function createScanSchedule(domain: string, frequency: string): Promise<ScanSchedule> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const nextRun = calculateNextRun(frequency);
+
+  const { data, error } = await supabase
+    .from('scan_schedules')
+    .insert({
+      user_id: user.id,
+      domain,
+      frequency,
+      next_run_at: nextRun.toISOString(),
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as unknown as ScanSchedule;
+}
+
+export async function toggleSchedule(id: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('scan_schedules')
+    .update({ enabled, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteSchedule(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('scan_schedules')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+function calculateNextRun(frequency: string): Date {
+  const now = new Date();
+  switch (frequency) {
+    case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    case 'biweekly': return new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    case 'monthly': return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    default: return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  }
+}
+
+// --- API Keys ---
+
+export interface ApiKey {
+  id: string;
+  key_prefix: string;
+  name: string;
+  permissions: string[];
+  last_used_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export async function getApiKeys(): Promise<ApiKey[]> {
+  const { data, error } = await supabase
+    .from('api_keys')
+    .select('id, key_prefix, name, permissions, last_used_at, expires_at, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as ApiKey[];
+}
+
+export async function createApiKey(name: string): Promise<{ key: string; apiKey: ApiKey }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const rawKey = `tl_${generateRandomKey(32)}`;
+  const keyPrefix = rawKey.slice(0, 7) + '...';
+  const keyHash = await hashString(rawKey);
+
+  const { data, error } = await supabase
+    .from('api_keys')
+    .insert({
+      user_id: user.id,
+      key_hash: keyHash,
+      key_prefix: keyPrefix,
+      name,
+    })
+    .select('id, key_prefix, name, permissions, last_used_at, expires_at, created_at')
+    .single();
+  if (error) throw error;
+
+  return { key: rawKey, apiKey: data as unknown as ApiKey };
+}
+
+export async function deleteApiKey(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('api_keys')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+function generateRandomKey(length: number): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const values = new Uint8Array(length);
+  crypto.getRandomValues(values);
+  for (const v of values) {
+    result += chars[v % chars.length];
+  }
+  return result;
+}
+
+async function hashString(str: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

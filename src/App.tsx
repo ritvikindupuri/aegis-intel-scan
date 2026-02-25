@@ -11,6 +11,7 @@ import ScanDetail from "./pages/ScanDetail";
 import History from "./pages/History";
 import Compare from "./pages/Compare";
 import Policies from "./pages/Policies";
+import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -39,6 +40,7 @@ const AppRoutes = () => {
       <Route path="/history" element={<ProtectedRoute><AppLayout><PageTransition><History /></PageTransition></AppLayout></ProtectedRoute>} />
       <Route path="/compare" element={<ProtectedRoute><AppLayout><PageTransition><Compare /></PageTransition></AppLayout></ProtectedRoute>} />
       <Route path="/policies" element={<ProtectedRoute><AppLayout><PageTransition><Policies /></PageTransition></AppLayout></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><AppLayout><PageTransition><Settings /></PageTransition></AppLayout></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

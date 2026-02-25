@@ -210,8 +210,44 @@ serve(async (req) => {
 
     // Generate findings and deduplicate by title+category
     const rawFindings = generateFindings(parsedData, technologies, domain);
+
+    // CVE lookup for detected technologies
+    let cveFindings: typeof rawFindings = [];
+    try {
+      const cveResp = await fetch(`${supabaseUrl}/functions/v1/cve-lookup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ technologies }),
+      });
+      if (cveResp.ok) {
+        const cveData = await cveResp.json();
+        for (const cve of (cveData.cves || [])) {
+          const severity = cve.severity === 'critical' ? 'critical' : cve.severity === 'high' ? 'high' : cve.severity === 'medium' ? 'medium' : 'low';
+          cveFindings.push({
+            title: `${cve.cveId}: ${cve.technology}`,
+            description: cve.description.slice(0, 500),
+            severity,
+            category: 'Known CVEs',
+            details: {
+              cveId: cve.cveId,
+              technology: cve.technology,
+              cvssScore: cve.cvssScore,
+              publishedDate: cve.publishedDate,
+              references: cve.references,
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('CVE lookup failed, continuing without CVE findings:', e);
+    }
+
+    const allFindings = [...rawFindings, ...cveFindings];
     const seen = new Set<string>();
-    const findings = rawFindings.filter(f => {
+    const findings = allFindings.filter(f => {
       const key = `${f.title}::${f.category}`;
       if (seen.has(key)) return false;
       seen.add(key);
