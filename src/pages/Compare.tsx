@@ -507,7 +507,7 @@ const Compare = () => {
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground/70 -mt-1">
-                        In <span className="font-mono font-semibold text-foreground">{dataB.scan.domain}</span> (B) but not in baseline — new attack vectors or previously hidden surfaces.
+                        Issues that appeared in scan B but weren't in scan A — these are new risks to investigate.
                       </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.newVulns.length === 0 ? (
@@ -535,7 +535,7 @@ const Compare = () => {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground/70 -mt-1">
-                        In <span className="font-mono font-semibold text-foreground">{dataA.scan.domain}</span> (A) but not in current scan — may indicate patching or access restriction, <span className="font-semibold text-muted-foreground">not confirmed remediation</span>.
+                        Issues found in scan A but missing from scan B — possibly fixed, but <span className="font-semibold text-muted-foreground">not confirmed</span>.
                       </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.resolved.length === 0 ? (
@@ -563,7 +563,7 @@ const Compare = () => {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground/70 -mt-1">
-                        Detected in both scans — the target's attack surface still exposes these weaknesses.
+                        Issues found in both scans — these haven't been resolved yet.
                       </p>
                       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                         {findingDiff.persistent.length === 0 ? (
