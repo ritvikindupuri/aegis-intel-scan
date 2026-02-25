@@ -7,8 +7,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { getScan, getFindings, generateReport, type Scan, type Finding } from "@/lib/api";
 import { SeverityBadge, RiskScoreGauge, StatusBadge } from "@/components/SeverityBadge";
 import { exportReportAsPdf } from "@/lib/pdf-export";
-import { AiChatPanel } from "@/components/AiChatPanel";
-import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code, Download, Info, Check, X as XIcon } from "lucide-react";
+import { AiChatPanel, renderMarkdown } from "@/components/AiChatPanel";
+import { Globe, FileCode, Link2, FormInput, Cpu, Shield, Loader2, FileText, AlertTriangle, ExternalLink, RefreshCw, Code, Download, Info, Check, X as XIcon, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -587,24 +587,26 @@ const ScanDetail = () => {
               <TabsContent value="report">
                 {scan.ai_report ? (
                   <div className="space-y-3">
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(scan.ai_report || '');
+                          toast({ title: "Copied to clipboard" });
+                        }}
+                        className="gap-1"
+                      >
+                        <Copy className="h-3 w-3" /> Copy Report
+                      </Button>
                       <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1">
                         <Download className="h-3 w-3" /> Download PDF
                       </Button>
                     </div>
                     <Card className="bg-card border-border">
-                      <CardContent className="p-6 prose prose-invert prose-sm max-w-none">
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed font-sans">
-                          {scan.ai_report.split('\n').map((line, i) => {
-                            if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold text-foreground mt-6 mb-2">{line.replace('## ', '').replace(/^\d+\.\s*/, '')}</h2>;
-                            if (line.startsWith('### ')) return <h3 key={i} className="text-base font-semibold text-foreground mt-4 mb-1">{line.replace('### ', '').replace(/^\d+\.\d+\s*/, '')}</h3>;
-                            if (line.startsWith('- ') || line.startsWith('* ')) return <div key={i} className="pl-4 text-muted-foreground">• {line.replace(/^[-*]\s*/, '').replace(/\*\*/g, '')}</div>;
-                            if (line.startsWith('**')) return <div key={i} className="font-semibold text-foreground">{line.replace(/\*\*/g, '')}</div>;
-                            if (line.startsWith('---')) return <hr key={i} className="border-border my-4" />;
-                            if (line.startsWith('*') && line.endsWith('*')) return <div key={i} className="text-xs text-muted-foreground italic">{line.replace(/\*/g, '')}</div>;
-                            if (line.trim() === '') return <div key={i} className="h-2" />;
-                            return <div key={i} className="text-muted-foreground">{line.replace(/\*\*/g, '')}</div>;
-                          })}
+                      <CardContent className="p-6 max-w-none">
+                        <div className="space-y-0.5 leading-relaxed">
+                          {renderMarkdown(scan.ai_report)}
                         </div>
                       </CardContent>
                     </Card>
