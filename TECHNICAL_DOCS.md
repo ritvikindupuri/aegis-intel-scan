@@ -46,7 +46,14 @@
     - 11.3 [Typography](#113-typography)
 12. [Security Architecture](#12-security-architecture)
 13. [API Layer](#13-api-layer)
-14. [Conclusion](#14-conclusion)
+14. [Elasticsearch Integration](#14-elasticsearch-integration)
+    - 14.1 [Architecture Overview](#141-architecture-overview)
+    - 14.2 [Index Schema](#142-index-schema)
+    - 14.3 [Data Sync Pipeline](#143-data-sync-pipeline)
+    - 14.4 [Search Engine](#144-search-engine)
+    - 14.5 [Global Search UI (Cmd+K)](#145-global-search-ui-cmdk)
+    - 14.6 [Kibana Dashboards](#146-kibana-dashboards)
+15. [Conclusion](#15-conclusion)
 
 ---
 
@@ -107,11 +114,13 @@ flowchart TD
     I6 --> J
     
     J --> K["Store in PostgreSQL\nscans + findings tables"]
-    K --> L["Display in Scan Detail UI\nauto-polls every 3s"]
+    K --> K2["elasticsearch-sync\nSync to Elastic Cloud"]
+    K2 --> L["Display in Scan Detail UI\nauto-polls every 3s"]
     
     L --> M["analyze-threats\nAI Report\n(Gemini 3 Flash Preview)"]
     L --> N["analyze-surface\nAI Chat\n(Gemini 3 Flash Preview)"]
     L --> O["PDF Export\n(jsPDF)"]
+    L --> P["Global Search\n(Cmd+K via Elasticsearch)"]
 ```
 
 <p align="center"><em>Figure 1 — End-to-End Data Flow: From Domain Input to Intelligence Output</em></p>
@@ -1654,9 +1663,264 @@ All error responses follow a consistent format:
 
 ---
 
-## 14. Conclusion
+## 14. Elasticsearch Integration
 
-ThreatLens represents a modern approach to automated threat intelligence that bridges the gap between manual penetration testing and fully automated security scanning. The architecture separates concerns cleanly — Firecrawl handles data acquisition, PostgreSQL provides persistence, and AI models deliver contextual analysis — while the React frontend presents everything through an intuitive, professional interface.
+ThreatLens integrates with Elastic Cloud to provide enterprise-grade full-text search, log aggregation, and analytics capabilities beyond what PostgreSQL offers natively. Every completed scan is automatically synchronized to three Elasticsearch indices, enabling sub-second fuzzy search across all historical findings, Kibana-powered dashboards for threat trend analysis, and an in-app global search command palette (⌘K) for instant cross-scan discovery.
+
+### 14.1 Architecture Overview
+
+```mermaid
+flowchart TD
+    subgraph ScanPipeline["Scan Pipeline"]
+        Scan["firecrawl-scan\nCompletes scan"] --> DB["PostgreSQL\nscans + findings"]
+    end
+
+    DB --> Sync["elasticsearch-sync\nEdge Function"]
+
+    Sync --> I1["threatlens-scans\nDomain metadata"]
+    Sync --> I2["threatlens-findings\nVulnerability records"]
+    Sync --> I3["threatlens-audit\nEvent log"]
+
+    subgraph Elastic["ELASTIC CLOUD"]
+        I1
+        I2
+        I3
+    end
+
+    subgraph Consumers["CONSUMERS"]
+        SearchFn["elasticsearch-search\nEdge Function"]
+        Kibana["Kibana\nDashboards + Discover"]
+    end
+
+    Elastic --> SearchFn
+    Elastic --> Kibana
+
+    SearchFn --> GlobalSearch["Global Search UI\n(Cmd+K)"]
+```
+
+<p align="center"><em>Figure 1 — Elasticsearch Integration Architecture: Sync, Search, and Analytics</em></p>
+
+**Step-by-step architecture breakdown:**
+
+1. **Trigger** — When the `firecrawl-scan` edge function completes a scan and writes results to PostgreSQL, it calls the `elasticsearch-sync` edge function with the `scanId`.
+2. **Sync** — The sync function fetches the scan record and all associated findings from PostgreSQL, then indexes them into three Elasticsearch indices with typed mappings.
+3. **Consumers** — Two systems consume the indexed data: the `elasticsearch-search` edge function (powering the in-app Global Search) and Kibana (for dashboards, Discover, and alerting).
+
+### 14.2 Index Schema
+
+Three custom indices store different aspects of scan intelligence. Each index is created with explicit mappings on first sync via the `ensureIndex()` helper — if the index already exists, the mapping step is skipped.
+
+#### `threatlens-scans` — Domain Scan Metadata
+
+| Field | ES Type | Source |
+|-------|---------|--------|
+| `domain` | `keyword` | `scans.domain` |
+| `status` | `keyword` | `scans.status` |
+| `risk_score` | `integer` | `scans.risk_score` |
+| `urls_found` | `integer` | `scans.urls_found` |
+| `vulnerabilities_found` | `integer` | `scans.vulnerabilities_found` |
+| `technologies` | `keyword` | `scans.technologies` (array) |
+| `created_at` | `date` | `scans.created_at` |
+| `updated_at` | `date` | `scans.updated_at` |
+| `user_id` | `keyword` | `scans.user_id` |
+| `ai_report` | `text` (standard analyzer) | `scans.ai_report` |
+
+Documents are indexed using the scan UUID as the document ID (`PUT threatlens-scans/_doc/{scanId}`), ensuring upsert behavior on re-sync.
+
+#### `threatlens-findings` — Vulnerability Records
+
+| Field | ES Type | Source |
+|-------|---------|--------|
+| `scan_id` | `keyword` | `findings.scan_id` |
+| `domain` | `keyword` | Denormalized from parent scan |
+| `title` | `text` + `keyword` sub-field | `findings.title` |
+| `description` | `text` (standard analyzer) | `findings.description` |
+| `severity` | `keyword` | `findings.severity` |
+| `category` | `keyword` | `findings.category` |
+| `details` | `object` (disabled indexing) | `findings.details` JSONB |
+| `created_at` | `date` | `findings.created_at` |
+
+Findings are bulk-indexed using the Elasticsearch `_bulk` API with NDJSON format for efficiency. Each finding uses its UUID as the document ID.
+
+The `title` field has a dual mapping: a `text` type for full-text search (tokenized, analyzed) and a `keyword` sub-field for exact match aggregations and sorting.
+
+#### `threatlens-audit` — Event Log
+
+| Field | ES Type | Source |
+|-------|---------|--------|
+| `event_type` | `keyword` | Always `"scan_completed"` |
+| `domain` | `keyword` | `scans.domain` |
+| `scan_id` | `keyword` | `scans.id` |
+| `user_id` | `keyword` | `scans.user_id` |
+| `risk_score` | `integer` | `scans.risk_score` |
+| `findings_count` | `integer` | Count of findings |
+| `technologies` | `keyword` | `scans.technologies` (array) |
+| `timestamp` | `date` | `new Date().toISOString()` (sync time) |
+
+Audit documents use auto-generated IDs (`POST threatlens-audit/_doc`) since they are append-only event records — each sync creates a new audit entry even if the same scan is re-synced.
+
+### 14.3 Data Sync Pipeline
+
+**File**: `supabase/functions/elasticsearch-sync/index.ts`
+
+The sync edge function is the bridge between PostgreSQL and Elasticsearch. It reads from the database, ensures indices exist with correct mappings, and writes documents to Elastic Cloud using Basic Auth over HTTPS.
+
+```mermaid
+flowchart TD
+    A["INPUT: scanId"] --> B["Fetch scan + findings\nfrom PostgreSQL\n(parallel queries)"]
+    B --> C["ensureIndex()\nthreatlens-scans\n(HEAD check, create if 404)"]
+    C --> D["ensureIndex()\nthreatlens-findings"]
+    D --> E["ensureIndex()\nthreatlens-audit"]
+    E --> F["PUT scan document\nthreatlens-scans/_doc/scanId"]
+    F --> G{"Findings\nexist?"}
+    G -- "YES" --> H["Bulk index findings\n_bulk API (NDJSON format)"]
+    G -- "NO" --> I["Skip findings"]
+    H --> J["POST audit entry\nthreatlens-audit/_doc"]
+    I --> J
+    J --> K["OUTPUT:\nscan: 1, findings: N, audit: 1"]
+```
+
+<p align="center"><em>Figure 2 — Elasticsearch Sync Pipeline: Database to Index</em></p>
+
+**Step-by-step sync breakdown:**
+
+1. **Input** — The function receives a `scanId` in the request body.
+2. **Database Fetch** — Two parallel queries fetch the scan record and its findings from PostgreSQL using the service role key (bypasses RLS).
+3. **Index Provisioning** — Three `ensureIndex()` calls check for index existence via `HEAD /{index}`. If a 404 is returned, the index is created with explicit field mappings via `PUT /{index}`. If the index already exists, the step is a no-op.
+4. **Scan Indexing** — The scan document is indexed with `PUT threatlens-scans/_doc/{scanId}`, using the scan ID as the document ID for idempotent upserts.
+5. **Findings Bulk Index** — If findings exist, they are formatted as NDJSON (alternating action/document lines) and submitted via `POST _bulk` with `Content-Type: application/x-ndjson`. Each finding includes a denormalized `domain` field copied from the parent scan.
+6. **Audit Entry** — A `scan_completed` audit event is appended to `threatlens-audit` with the current timestamp, scan metadata, and finding count.
+7. **Output** — The function returns counts of indexed documents: `{ scan: 1, findings: N, audit: 1 }`.
+
+**Required secrets:**
+
+| Secret | Purpose |
+|--------|---------|
+| `ELASTICSEARCH_URL` | Elastic Cloud endpoint (e.g., `https://xxx.es.us-central1.gcp.cloud.es.io:443`) |
+| `ELASTICSEARCH_USERNAME` | Elastic user (typically `elastic`) |
+| `ELASTICSEARCH_PASSWORD` | Elastic user password |
+| `SUPABASE_SERVICE_ROLE_KEY` | Database access (bypass RLS) |
+
+### 14.4 Search Engine
+
+**File**: `supabase/functions/elasticsearch-search/index.ts`
+
+The search edge function provides a flexible query API over the indexed data. It supports full-text search with fuzzy matching, field boosting, term filters, date ranges, result highlighting, and aggregations — all exposed through a single endpoint.
+
+**Query construction:**
+
+```mermaid
+flowchart LR
+    Input["INPUT:\nquery, filters,\nsize, from, aggs"] --> MultiMatch["multi_match\ntitle x3, description x2,\ndomain x2, category,\nai_report, technologies\nfuzziness: AUTO"]
+    
+    MultiMatch --> Bool["bool query\nmust + filter"]
+    
+    Filters["Term Filters:\nseverity, category,\ndomain, date range"] --> Bool
+    
+    Bool --> Highlight["Highlight:\ntitle, description\nmark tags"]
+    
+    Bool --> Aggs["Aggregations:\nseverity_counts,\ncategory_counts,\ndomain_counts,\ntimeline"]
+    
+    Highlight --> Output["OUTPUT:\ntotal, hits,\naggregations"]
+    Aggs --> Output
+```
+
+<p align="center"><em>Figure 3 — Elasticsearch Search Query Construction</em></p>
+
+**Step-by-step search breakdown:**
+
+1. **Multi-match query** — The search query is matched against six fields with field boosting: `title` (3x), `description` (2x), `domain` (2x), `category` (1x), `ai_report` (1x), and `technologies` (1x). Fuzziness is set to `AUTO` for typo tolerance.
+2. **Bool filter** — Optional term filters for `severity`, `category`, and `domain` are applied as `bool.filter` clauses (non-scoring). Date range filters use the `range` query on `created_at`.
+3. **Sorting** — Results are sorted by `_score` (relevance) descending, then `created_at` descending as a tiebreaker.
+4. **Highlighting** — Matching text in `title` and `description` fields is wrapped in `<mark>` tags for visual emphasis in the UI.
+5. **Aggregations** — When requested, the function returns bucket aggregations: `severity_counts` (term agg on `severity`), `category_counts` (term agg on `category`, top 20), `domain_counts` (term agg on `domain`, top 20), and `timeline` (date histogram on `created_at`, daily buckets).
+6. **Target index** — Defaults to `threatlens-findings` but can be overridden via the `index` parameter to search `threatlens-scans` or `threatlens-audit`.
+
+**Client-side API function** (in `src/lib/api.ts`):
+
+```typescript
+export async function searchElastic(
+  query: string,
+  options?: {
+    index?: string;
+    filters?: {
+      severity?: string;
+      category?: string;
+      domain?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    };
+    size?: number;
+    from?: number;
+    aggs?: string[];
+  }
+): Promise<ElasticSearchResponse>
+```
+
+### 14.5 Global Search UI (⌘K)
+
+**File**: `src/components/GlobalSearch.tsx`
+
+The Global Search is a command-palette-style search interface embedded in the application header, providing instant cross-scan search powered by Elasticsearch. It is always accessible via the ⌘K (Cmd+K / Ctrl+K) keyboard shortcut or by clicking the search trigger button in the navigation bar.
+
+```mermaid
+flowchart TD
+    A["User presses Cmd+K\nor clicks search trigger"] --> B["Search overlay opens\n(AnimatePresence animation)"]
+    B --> C["User types query"]
+    C --> D["300ms debounce"]
+    D --> E["searchElastic()\nvia elasticsearch-search\nedge function"]
+    E --> F["Display results\nwith mark highlights"]
+    F --> G["Show aggregation\nseverity + category pills"]
+    
+    G --> H{"User clicks\nresult?"}
+    H -- "YES" --> I["Navigate to\n/scan/scanId"]
+    H -- "NO" --> J{"User applies\nfilter?"}
+    J -- "YES" --> E
+    J -- "NO" --> K{"Escape or\nclick outside?"}
+    K -- "YES" --> L["Close overlay"]
+```
+
+<p align="center"><em>Figure 4 — Global Search UI: Interaction Flow</em></p>
+
+**Step-by-step UI breakdown:**
+
+1. **Trigger** — A compact search button in the header displays "Search findings..." with a `⌘K` keyboard badge. Clicking it or pressing ⌘K/Ctrl+K opens the search overlay.
+2. **Overlay** — A 420–520px wide floating panel renders with a Framer Motion fade + scale animation (0.15s). It positions absolutely over the header, anchored to the right.
+3. **Input** — A borderless input field with a search icon auto-focuses on open. The user types their query.
+4. **Debounce** — Input changes are debounced by 300ms to avoid excessive API calls during typing.
+5. **Search Execution** — After the debounce, `searchElastic()` is called with the query, any active filters, `size: 15`, and aggregation requests for `severity` and `category`.
+6. **Results Rendering** — Each result displays:
+   - A `SeverityBadge` component with the finding's severity level
+   - The domain name in monospace font
+   - The finding title with `<mark>` highlighted matches (rendered via `dangerouslySetInnerHTML`)
+   - The description with highlighted matches (truncated to 2 lines via `line-clamp-2`)
+   - A category badge (`Badge` component with `outline` variant)
+7. **Aggregation Summary** — Below the results, clickable severity pills show bucket counts (e.g., "critical: 3", "high: 7"). Clicking a pill toggles that severity as a filter and re-executes the search.
+8. **Category Filter** — A dropdown populated dynamically from the `category_counts` aggregation allows filtering by finding category. Each option shows the category name and document count.
+9. **Result Navigation** — Clicking a result navigates to `/scan/{scanId}` using the `scan_id` from the finding's source document, then closes and resets the search overlay.
+10. **Dismissal** — Pressing Escape or clicking outside the overlay closes it. Click-outside detection uses a `mousedown` event listener on the document.
+
+### 14.6 Kibana Dashboards
+
+With scan data indexed in Elasticsearch, Kibana provides powerful visualization and analytics capabilities without any custom frontend code. The following dashboard configurations are recommended for security operations:
+
+| Visualization | Type | Index | Configuration |
+|--------------|------|-------|---------------|
+| **Threat Timeline** | Line chart | `threatlens-findings` | X-axis: `created_at` (date histogram, daily), Split series by `severity` |
+| **Severity Breakdown** | Donut chart | `threatlens-findings` | Slice by `severity` (terms agg) |
+| **Domain Heatmap** | Heatmap | `threatlens-findings` | X-axis: `domain` (terms), Y-axis: `severity` (terms), Value: count |
+| **Top Categories** | Horizontal bar | `threatlens-findings` | Y-axis: `category` (terms), X-axis: count |
+| **Risk Score Trend** | Line chart | `threatlens-scans` | X-axis: `created_at`, Y-axis: `risk_score` (average), Split by `domain` |
+| **Scan Activity** | Area chart | `threatlens-audit` | X-axis: `timestamp` (date histogram), Y-axis: count |
+| **Technology Distribution** | Tag cloud | `threatlens-scans` | Field: `technologies` (terms agg) |
+
+**Data View setup**: Create a Kibana Data View with index pattern `threatlens-*` and timestamp field `created_at` to query across all three indices simultaneously. For focused analysis, create separate data views for each index (`threatlens-findings`, `threatlens-scans`, `threatlens-audit`).
+
+---
+
+## 15. Conclusion
+
+ThreatLens represents a modern approach to automated threat intelligence that bridges the gap between manual penetration testing and fully automated security scanning. The architecture separates concerns cleanly — Firecrawl handles data acquisition, PostgreSQL provides persistence, Elasticsearch delivers enterprise search and analytics, and AI models deliver contextual analysis — while the React frontend presents everything through an intuitive, professional interface.
 
 The AI domain policy agent is a differentiating feature that addresses the ethical dimension of security scanning tools. By evaluating targets before scanning, ThreatLens ensures its capabilities are used responsibly while maintaining the speed and convenience that security professionals need.
 
@@ -1664,6 +1928,8 @@ Key architectural decisions:
 - **Serverless edge functions** for zero-infrastructure backend scaling
 - **Unified AI model**: All functions use `google/gemini-3-flash-preview` via the Lovable AI Gateway for consistent, high-quality inference
 - **Unified AI Gateway integration**: All functions route through the Lovable AI Gateway with auto-provisioned API keys
+- **Elasticsearch integration**: Automatic sync to Elastic Cloud for full-text search, Kibana dashboards, and enterprise analytics
+- **Global Search (⌘K)**: Command-palette search powered by Elasticsearch with fuzzy matching, filtering, and aggregations
 - **Profile-based access control** ensuring only registered users can operate the platform
 - **Immutable audit logging** for accountability and compliance
 - **Dark-mode cybersecurity aesthetic** with custom CSS design tokens, glass morphism, gradient text, and Framer Motion animations

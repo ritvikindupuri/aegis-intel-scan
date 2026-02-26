@@ -28,6 +28,8 @@ ThreatLens is an AI-powered cybersecurity platform that automates threat intelli
 - **Real CVE Vulnerability Scanning** — Detected technologies are matched against the NIST NVD 2.0 database to surface known CVEs with severity scores and reference links.
 - **Per-User Rate Limiting** — Configurable daily scan quotas (default 10/day) prevent Firecrawl credit exhaustion and enforce fair usage.
 - **Real WHOIS & Geolocation Enrichment** — Live RDAP lookups and ip-api.com geolocation replace all simulated data with real-time registration, hosting, and network details.
+- **Elasticsearch Integration** — Completed scans are automatically synced to Elastic Cloud across three indices (scans, findings, audit). Enables enterprise-grade full-text search, Kibana dashboards, and threat analytics.
+- **Global Search (⌘K)** — Command-palette search bar powered by Elasticsearch with fuzzy matching, severity/category filtering, result highlighting, and aggregation summaries.
 
 ---
 
@@ -79,17 +81,19 @@ graph TB
         ScanDetail["Scan\nDetail"]
         History["History\nCompare"]
         Policies["Policies\nAudit Log"]
+        GlobalSearch["Global Search\n(Cmd+K)"]
         Dashboard --> SBClient
         ScanDetail --> SBClient
         History --> SBClient
         Policies --> SBClient
+        GlobalSearch --> SBClient
         SBClient["Supabase JS Client"]
     end
 
     SBClient --> Backend
 
     subgraph Backend["LOVABLE CLOUD"]
-        DB["PostgreSQL\nscans | findings | profiles\npolicies | audit_log"]
+        DB["PostgreSQL\nscans | findings | profiles\npolicies | audit_log | quotas"]
         EF["Edge Functions"]
         Auth["Auth - Google OAuth"]
         EF --> DB
@@ -100,19 +104,21 @@ graph TB
         Firecrawl["Firecrawl API\nWeb Scraping"]
         AI["Lovable AI Gateway\nGemini 3 Flash Preview"]
         Google["Google OAuth\nIdentity Provider"]
+        Elastic["Elastic Cloud\nSearch and Analytics"]
     end
 
     EF --> Firecrawl
     EF --> AI
+    EF --> Elastic
     Auth --> Google
 ```
 
 <p align="center"><em>Figure 1 — ThreatLens System Architecture Overview</em></p>
 
-- **Client Layer** — A React SPA (built with Vite + TypeScript) renders four main pages: Dashboard, Scan Detail, History/Compare, and Policies. All backend communication flows through a single Supabase JS client instance.
-- **Lovable Cloud** — Four serverless Deno edge functions handle all backend compute: scan orchestration (`firecrawl-scan`), AI threat reports (`analyze-threats`), interactive AI chat (`analyze-surface`), and domain policy evaluation (`evaluate-domain`). PostgreSQL stores all persistent data across five tables (scans, findings, profiles, domain_policies, scan_audit_log). Google OAuth manages user authentication.
-- **External Services** — Two external APIs are consumed: Firecrawl for web scraping (HTML extraction via `/v1/scrape` + site mapping via `/v1/map`) and the Lovable AI Gateway for all AI inference using `google/gemini-3-flash-preview`.
-- **Data Flow** — A user enters a domain → the policy agent evaluates it (allow/block/review) → Firecrawl scrapes and maps the site → raw data is parsed into endpoints, technologies, headers, and forms → findings are generated across six categories → a risk score is calculated → the user can then trigger AI reports, chat with the AI analyst, or export PDFs.
+- **Client Layer** — A React SPA (built with Vite + TypeScript) renders five main views: Dashboard, Scan Detail, History/Compare, Policies, and Global Search. The Global Search command palette (⌘K) queries Elasticsearch for cross-scan full-text search. All backend communication flows through a single Supabase JS client instance.
+- **Lovable Cloud** — Six serverless Deno edge functions handle all backend compute: scan orchestration (`firecrawl-scan`), AI threat reports (`analyze-threats`), interactive AI chat (`analyze-surface`), domain policy evaluation (`evaluate-domain`), Elasticsearch sync (`elasticsearch-sync`), and Elasticsearch search (`elasticsearch-search`). PostgreSQL stores all persistent data. Google OAuth manages user authentication.
+- **External Services** — Three external platforms are consumed: Firecrawl for web scraping, the Lovable AI Gateway for AI inference using `google/gemini-3-flash-preview`, and Elastic Cloud for enterprise-grade full-text search, log aggregation, and analytics dashboards (via Kibana).
+- **Data Flow** — A user enters a domain → the policy agent evaluates it → Firecrawl scrapes and maps the site → data is parsed and findings generated → risk score calculated → results stored in PostgreSQL → automatically synced to Elasticsearch → searchable via Global Search (⌘K) and Kibana dashboards.
 
 For comprehensive technical documentation covering every system flow, database schema, AI integration, and security architecture in detail, see **[TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md)**.
 
@@ -133,6 +139,7 @@ For comprehensive technical documentation covering every system flow, database s
 | **Web Scraping** | Firecrawl API (scrape + map endpoints) |
 | **PDF Export** | jsPDF |
 | **Charts** | Recharts |
+| **Search & Analytics** | Elastic Cloud (Elasticsearch + Kibana) |
 
 ---
 
