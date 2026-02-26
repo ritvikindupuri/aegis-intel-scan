@@ -256,9 +256,20 @@ export function GlobalSearch() {
               )}
 
               {!query && !error && (
-                <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  <p>Search across all findings, domains, and CVEs</p>
-                  <p className="text-xs mt-1">Try "XSS", "wordpress", or "CVE-2024"</p>
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground space-y-3">
+                  <p className="font-medium text-foreground/70">Elasticsearch-Powered Search</p>
+                  <p className="text-xs">
+                    Query your Elasticsearch indices in real time — scans, findings, and audit logs are all indexed and searchable.
+                  </p>
+                  <div className="text-xs space-y-1.5 text-left max-w-[320px] mx-auto">
+                    <p className="text-muted-foreground/80 font-medium mb-1">Example queries:</p>
+                    <p><span className="font-mono text-primary/80 bg-primary/5 px-1 rounded">"CVE-2024-1234"</span> — look up a specific CVE by ID</p>
+                    <p><span className="font-mono text-primary/80 bg-primary/5 px-1 rounded">XSS</span> — find cross-site scripting findings</p>
+                    <p><span className="font-mono text-primary/80 bg-primary/5 px-1 rounded">sql injection</span> — search for SQLi vulnerabilities</p>
+                    <p><span className="font-mono text-primary/80 bg-primary/5 px-1 rounded">wordpress</span> — find CMS-related exposures</p>
+                    <p><span className="font-mono text-primary/80 bg-primary/5 px-1 rounded">open ports</span> — surface port / service findings</p>
+                    <p><span className="font-mono text-primary/80 bg-primary/5 px-1 rounded">example.com</span> — filter by target domain</p>
+                  </div>
                 </div>
               )}
             </div>
