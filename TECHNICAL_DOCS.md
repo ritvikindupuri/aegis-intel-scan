@@ -1863,6 +1863,16 @@ export async function searchElastic(
 
 The Global Search is a command-palette-style search interface embedded in the application header, providing instant cross-scan search powered by Elasticsearch. It is always accessible via the ⌘K (Cmd+K / Ctrl+K) keyboard shortcut or by clicking the search trigger button in the navigation bar.
 
+<p align="center">
+  <img src="public/docs/global-search-trigger.png" alt="Global Search trigger button in the navigation header showing the ⌘K shortcut badge" width="600" />
+</p>
+<p align="center"><em>Figure 5 — Global Search Trigger: The compact search button in the application header with ⌘K keyboard shortcut badge</em></p>
+
+<p align="center">
+  <img src="public/docs/global-search-results.png" alt="Global Search overlay showing search results with severity badges, highlighted matches, and aggregation pills" width="600" />
+</p>
+<p align="center"><em>Figure 6 — Global Search Results Panel: Fuzzy-matched findings with severity badges, highlighted text, category filters, and aggregation summary pills</em></p>
+
 ```mermaid
 flowchart TD
     A["User presses Cmd+K\nor clicks search trigger"] --> B["Search overlay opens\n(AnimatePresence animation)"]
@@ -1915,6 +1925,11 @@ With scan data indexed in Elasticsearch, Kibana provides powerful visualization 
 | **Technology Distribution** | Tag cloud | `threatlens-scans` | Field: `technologies` (terms agg) |
 
 **Data View setup**: Create a Kibana Data View with index pattern `threatlens-*` and timestamp field `created_at` to query across all three indices simultaneously. For focused analysis, create separate data views for each index (`threatlens-findings`, `threatlens-scans`, `threatlens-audit`).
+
+<p align="center">
+  <img src="public/docs/kibana-findings-discover.png" alt="Kibana Discover view showing the threatlens-findings index with 26 documents, field list, and JSON document detail including CVE data" width="800" />
+</p>
+<p align="center"><em>Figure 7 — Kibana Discover: Browsing the threatlens-findings index with 26 indexed vulnerability documents. The JSON panel shows a CVE-2000-0967 finding for wordpress.org with severity, category, and reference links.</em></p>
 
 ---
 
