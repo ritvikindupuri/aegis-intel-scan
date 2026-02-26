@@ -11,37 +11,61 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const esUrl = Deno.env.get('ELASTICSEARCH_URL');
-  const esUser = Deno.env.get('ELASTICSEARCH_USERNAME');
-  const esPass = Deno.env.get('ELASTICSEARCH_PASSWORD');
-
-  if (!esUrl || !esUser || !esPass) {
-    return new Response(JSON.stringify({ error: 'Elasticsearch not configured' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-
-  const esAuth = btoa(`${esUser}:${esPass}`);
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    const { scanId } = await req.json();
+    const { scanId, action } = await req.json();
     if (!scanId) {
       return new Response(JSON.stringify({ error: 'scanId is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Fetch scan and findings from DB
-    const [{ data: scan, error: scanErr }, { data: findings, error: findErr }] = await Promise.all([
-      supabase.from('scans').select('*').eq('id', scanId).single(),
-      supabase.from('findings').select('*').eq('scan_id', scanId),
-    ]);
+    // Get the scan to find user_id
+    const { data: scan, error: scanErr } = await supabase
+      .from('scans').select('*').eq('id', scanId).single();
 
-    if (scanErr) throw scanErr;
-    if (!scan) throw new Error('Scan not found');
+    if (scanErr || !scan) {
+      // For delete action, scan may already be gone from DB — just proceed with ES cleanup
+      if (action === 'delete') {
+        // Try to get user ES config from auth header
+        const esConfig = await getUserEsConfigFromAuth(req, supabaseUrl, supabase);
+        if (esConfig) {
+          await deleteFromEs(esConfig, scanId);
+          return new Response(JSON.stringify({ success: true, action: 'deleted' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        return new Response(JSON.stringify({ error: 'Scan not found and no ES config' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      throw scanErr || new Error('Scan not found');
+    }
+
+    // Look up user's Elasticsearch config
+    const esConfig = await getUserEsConfig(supabase, scan.user_id);
+    if (!esConfig) {
+      return new Response(JSON.stringify({ skipped: true, reason: 'No Elasticsearch configured for user' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { esUrl, esAuth } = esConfig;
+
+    // Handle delete action
+    if (action === 'delete') {
+      await deleteFromEs(esConfig, scanId);
+      return new Response(JSON.stringify({ success: true, action: 'deleted' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Fetch findings
+    const { data: findings } = await supabase
+      .from('findings').select('*').eq('scan_id', scanId);
 
     // Ensure indices exist with mappings
     await ensureIndex(esUrl, esAuth, 'threatlens-scans', {
@@ -151,6 +175,72 @@ serve(async (req) => {
   }
 });
 
+// Get ES config for a user from DB
+async function getUserEsConfig(supabase: any, userId: string | null): Promise<{ esUrl: string; esAuth: string } | null> {
+  if (!userId) return null;
+
+  const { data, error } = await supabase
+    .from('user_elasticsearch_config')
+    .select('elasticsearch_url, elasticsearch_username, elasticsearch_password, enabled')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data || !data.enabled) return null;
+
+  return {
+    esUrl: data.elasticsearch_url,
+    esAuth: btoa(`${data.elasticsearch_username}:${data.elasticsearch_password}`),
+  };
+}
+
+// Get ES config from auth header (for delete when scan is already gone)
+async function getUserEsConfigFromAuth(req: Request, supabaseUrl: string, supabase: any): Promise<{ esUrl: string; esAuth: string } | null> {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader) return null;
+
+  const token = authHeader.replace('Bearer ', '');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data: { user } } = await userClient.auth.getUser();
+  if (!user) return null;
+
+  return getUserEsConfig(supabase, user.id);
+}
+
+// Delete scan data from Elasticsearch
+async function deleteFromEs(esConfig: { esUrl: string; esAuth: string }, scanId: string) {
+  const { esUrl, esAuth } = esConfig;
+
+  // Delete the scan document
+  try {
+    await esRequest(esUrl, esAuth, `threatlens-scans/_doc/${scanId}`, 'DELETE');
+  } catch (e) {
+    console.warn('Failed to delete scan from ES (may not exist):', e);
+  }
+
+  // Delete all findings for this scan using delete_by_query
+  try {
+    await esRequest(esUrl, esAuth, `threatlens-findings/_delete_by_query`, 'POST', {
+      query: { term: { scan_id: scanId } }
+    });
+  } catch (e) {
+    console.warn('Failed to delete findings from ES:', e);
+  }
+
+  // Log deletion in audit
+  try {
+    await esRequest(esUrl, esAuth, `threatlens-audit/_doc`, 'POST', {
+      event_type: 'scan_deleted',
+      scan_id: scanId,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.warn('Failed to log deletion audit:', e);
+  }
+}
+
 async function ensureIndex(esUrl: string, esAuth: string, index: string, mappings: any) {
   const resp = await fetch(`${esUrl}/${index}`, {
     method: 'HEAD',
@@ -159,7 +249,6 @@ async function ensureIndex(esUrl: string, esAuth: string, index: string, mapping
   if (resp.status === 404) {
     await esRequest(esUrl, esAuth, index, 'PUT', { mappings });
   }
-  // Consume body if any
   try { await resp.text(); } catch {}
 }
 
@@ -182,7 +271,7 @@ async function esRequest(esUrl: string, esAuth: string, path: string, method: st
   const resp = await fetch(`${esUrl}/${path}`, { method, headers, body: bodyStr });
   const text = await resp.text();
 
-  if (!resp.ok) {
+  if (!resp.ok && resp.status !== 404) {
     console.error(`ES ${method} ${path} failed [${resp.status}]:`, text);
     throw new Error(`Elasticsearch request failed: ${resp.status}`);
   }

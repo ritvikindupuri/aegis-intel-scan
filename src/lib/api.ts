@@ -128,6 +128,15 @@ export async function getFindings(scanId: string): Promise<Finding[]> {
 }
 
 export async function deleteScan(id: string): Promise<void> {
+  // Delete from Elasticsearch first (fire-and-forget, don't block on failure)
+  try {
+    await supabase.functions.invoke('elasticsearch-sync', {
+      body: { scanId: id, action: 'delete' },
+    });
+  } catch (e) {
+    console.warn('ES delete failed (non-blocking):', e);
+  }
+
   const { error: findingsError } = await supabase
     .from('findings')
     .delete()
@@ -321,4 +330,70 @@ export async function syncToElastic(scanId: string): Promise<void> {
   });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
+}
+
+// --- User Elasticsearch Config ---
+
+export interface UserElasticsearchConfig {
+  id: string;
+  elasticsearch_url: string;
+  elasticsearch_username: string;
+  elasticsearch_password: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getElasticsearchConfig(): Promise<UserElasticsearchConfig | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('user_elasticsearch_config')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as unknown as UserElasticsearchConfig;
+}
+
+export async function saveElasticsearchConfig(config: {
+  elasticsearch_url: string;
+  elasticsearch_username: string;
+  elasticsearch_password: string;
+  enabled: boolean;
+}): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: existing } = await supabase
+    .from('user_elasticsearch_config')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('user_elasticsearch_config')
+      .update(config)
+      .eq('user_id', user.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('user_elasticsearch_config')
+      .insert({ ...config, user_id: user.id });
+    if (error) throw error;
+  }
+}
+
+export async function deleteElasticsearchConfig(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('user_elasticsearch_config')
+    .delete()
+    .eq('user_id', user.id);
+  if (error) throw error;
 }
