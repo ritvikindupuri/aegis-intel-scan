@@ -4,6 +4,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import threatLensLogo from "@/assets/threatlens-logo.png";
 
 const navItems = [
@@ -29,7 +30,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="text-foreground">Lens</span>
             </span>
           </Link>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <GlobalSearch />
             <nav className="flex items-center gap-0.5">
               {navItems.map(({ to, icon: Icon, label }) => (
                 <Link
