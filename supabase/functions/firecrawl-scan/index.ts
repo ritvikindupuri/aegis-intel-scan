@@ -268,6 +268,20 @@ serve(async (req) => {
       risk_score: riskScore,
     }).eq('id', currentScanId);
 
+    // Sync to Elasticsearch (fire-and-forget)
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/elasticsearch-sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ scanId: currentScanId }),
+      });
+    } catch (e) {
+      console.warn('Elasticsearch sync trigger failed (non-blocking):', e);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       scanId: currentScanId,

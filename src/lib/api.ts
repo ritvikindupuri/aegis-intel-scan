@@ -280,3 +280,45 @@ async function hashString(str: string): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
+
+// --- Elasticsearch Search ---
+
+export interface ElasticSearchResult {
+  id: string;
+  index: string;
+  score: number;
+  source: Record<string, any>;
+  highlight?: Record<string, string[]>;
+}
+
+export interface ElasticSearchResponse {
+  total: number;
+  hits: ElasticSearchResult[];
+  aggregations?: Record<string, any>;
+}
+
+export async function searchElastic(
+  query: string,
+  options?: {
+    index?: string;
+    filters?: { severity?: string; category?: string; domain?: string; dateFrom?: string; dateTo?: string };
+    size?: number;
+    from?: number;
+    aggs?: string[];
+  }
+): Promise<ElasticSearchResponse> {
+  const { data, error } = await supabase.functions.invoke('elasticsearch-search', {
+    body: { query, ...options },
+  });
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+export async function syncToElastic(scanId: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('elasticsearch-sync', {
+    body: { scanId },
+  });
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+}

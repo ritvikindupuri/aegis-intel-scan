@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.analyze-surface]
 verify_jwt = false
+
+[functions.elasticsearch-sync]
+verify_jwt = false
+
+[functions.elasticsearch-search]
+verify_jwt = false
