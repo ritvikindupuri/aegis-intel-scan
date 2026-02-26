@@ -1927,7 +1927,7 @@ With scan data indexed in Elasticsearch, Kibana provides powerful visualization 
 **Data View setup**: Create a Kibana Data View with index pattern `threatlens-*` and timestamp field `created_at` to query across all three indices simultaneously. For focused analysis, create separate data views for each index (`threatlens-findings`, `threatlens-scans`, `threatlens-audit`).
 
 <p align="center">
-  <img src="https://imgur.com/n59pKSg" alt="Kibana Discover view showing the threatlens-findings index with 26 documents, field list, and JSON document detail including CVE data" width="800" />
+  <img src="https://i.imgur.com/n59pKSg.png" alt="Kibana Discover view showing the threatlens-findings index with 26 documents, field list, and JSON document detail including CVE data" width="800" />
 </p>
 <p align="center"><em>Figure 7 — Kibana Discover: Browsing the threatlens-findings index with 26 indexed vulnerability documents. The JSON panel shows a CVE-2000-0967 finding for wordpress.org with severity, category, and reference links.</em></p>
 
