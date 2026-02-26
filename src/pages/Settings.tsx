@@ -11,10 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import {
   getScanSchedules, createScanSchedule, toggleSchedule, deleteSchedule,
   getApiKeys, createApiKey, deleteApiKey,
-  type ScanSchedule, type ApiKey,
+  getElasticsearchConfig, saveElasticsearchConfig, deleteElasticsearchConfig,
+  type ScanSchedule, type ApiKey, type UserElasticsearchConfig,
 } from "@/lib/api";
 import {
-  Calendar, Key, Plus, Trash2, Copy, Clock, Globe, Shield, Loader2,
+  Calendar, Key, Plus, Trash2, Copy, Clock, Globe, Shield, Loader2, Database, Eye, EyeOff, CheckCircle2,
 } from "lucide-react";
 
 const ApiExample = ({ label, code, onCopy }: { label: string; code: string; onCopy: (t: string) => void }) => (
@@ -51,9 +52,20 @@ const Settings = () => {
   const [creatingKey, setCreatingKey] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
+  // Elasticsearch config state
+  const [esConfig, setEsConfig] = useState<UserElasticsearchConfig | null>(null);
+  const [loadingEs, setLoadingEs] = useState(true);
+  const [savingEs, setSavingEs] = useState(false);
+  const [esUrl, setEsUrl] = useState("");
+  const [esUsername, setEsUsername] = useState("");
+  const [esPassword, setEsPassword] = useState("");
+  const [esEnabled, setEsEnabled] = useState(true);
+  const [showEsPassword, setShowEsPassword] = useState(false);
+
   useEffect(() => {
     loadSchedules();
     loadApiKeys();
+    loadEsConfig();
   }, []);
 
   const loadSchedules = async () => {
@@ -71,6 +83,21 @@ const Settings = () => {
       setApiKeys(data);
     } catch { /* empty */ } finally {
       setLoadingKeys(false);
+    }
+  };
+
+  const loadEsConfig = async () => {
+    try {
+      const config = await getElasticsearchConfig();
+      setEsConfig(config);
+      if (config) {
+        setEsUrl(config.elasticsearch_url);
+        setEsUsername(config.elasticsearch_username);
+        setEsPassword(config.elasticsearch_password);
+        setEsEnabled(config.enabled);
+      }
+    } catch { /* empty */ } finally {
+      setLoadingEs(false);
     }
   };
 
@@ -139,6 +166,42 @@ const Settings = () => {
     toast({ title: "Copied to clipboard" });
   };
 
+  const handleSaveEsConfig = async () => {
+    if (!esUrl.trim() || !esUsername.trim() || !esPassword.trim()) {
+      toast({ title: "Missing fields", description: "All Elasticsearch fields are required.", variant: "destructive" });
+      return;
+    }
+    setSavingEs(true);
+    try {
+      await saveElasticsearchConfig({
+        elasticsearch_url: esUrl.trim(),
+        elasticsearch_username: esUsername.trim(),
+        elasticsearch_password: esPassword.trim(),
+        enabled: esEnabled,
+      });
+      await loadEsConfig();
+      toast({ title: "Elasticsearch configured", description: "Your cluster settings have been saved. New scans will sync automatically." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingEs(false);
+    }
+  };
+
+  const handleDeleteEsConfig = async () => {
+    try {
+      await deleteElasticsearchConfig();
+      setEsConfig(null);
+      setEsUrl("");
+      setEsUsername("");
+      setEsPassword("");
+      setEsEnabled(true);
+      toast({ title: "Elasticsearch disconnected", description: "Your cluster configuration has been removed." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   return (
     <motion.div
       className="space-y-6 max-w-4xl mx-auto"
@@ -148,17 +211,20 @@ const Settings = () => {
     >
       <motion.div variants={fadeInUp}>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage scheduled scans and API access.</p>
+        <p className="text-muted-foreground text-sm mt-1">Manage scheduled scans, API access, and integrations.</p>
       </motion.div>
 
       <motion.div variants={fadeInUp}>
         <Tabs defaultValue="schedules">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="schedules" className="gap-2">
-              <Calendar className="h-4 w-4" /> Scheduled Scans
+              <Calendar className="h-4 w-4" /> Schedules
             </TabsTrigger>
             <TabsTrigger value="api-keys" className="gap-2">
               <Key className="h-4 w-4" /> API Keys
+            </TabsTrigger>
+            <TabsTrigger value="elasticsearch" className="gap-2">
+              <Database className="h-4 w-4" /> Elasticsearch
             </TabsTrigger>
           </TabsList>
 
@@ -342,6 +408,120 @@ const Settings = () => {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="elasticsearch" className="space-y-4 mt-4">
+            {/* Info card */}
+            <Card className="p-5 bg-secondary/20 border-dashed">
+              <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                <Database className="h-4 w-4 text-primary" /> Elasticsearch Integration
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Connect your own Elastic Cloud cluster to enable full-text search across all findings,
+                Kibana dashboards for threat analytics, and automatic sync of scan results. Your credentials
+                are stored securely and used exclusively for your account. Each user maintains their own
+                independent Elasticsearch cluster — no data is shared between accounts.
+              </p>
+            </Card>
+
+            {/* Config form */}
+            {loadingEs ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : (
+              <Card className="p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Cluster Configuration</h3>
+                  {esConfig && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                      <span className="text-xs text-success font-medium">Connected</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Elasticsearch URL</label>
+                    <Input
+                      value={esUrl}
+                      onChange={e => setEsUrl(e.target.value)}
+                      placeholder="https://your-cluster.es.us-central1.gcp.cloud.es.io:443"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Username</label>
+                      <Input
+                        value={esUsername}
+                        onChange={e => setEsUsername(e.target.value)}
+                        placeholder="elastic"
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Password</label>
+                      <div className="relative">
+                        <Input
+                          type={showEsPassword ? "text" : "password"}
+                          value={esPassword}
+                          onChange={e => setEsPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="font-mono text-sm pr-10"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full w-10"
+                          onClick={() => setShowEsPassword(!showEsPassword)}
+                        >
+                          {showEsPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <p className="text-sm font-medium">Enable sync</p>
+                      <p className="text-xs text-muted-foreground">Automatically sync completed scans to your cluster</p>
+                    </div>
+                    <Switch checked={esEnabled} onCheckedChange={setEsEnabled} />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    onClick={handleSaveEsConfig}
+                    disabled={savingEs || !esUrl.trim() || !esUsername.trim() || !esPassword.trim()}
+                    className="gap-2"
+                  >
+                    {savingEs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+                    {esConfig ? "Update Configuration" : "Connect Cluster"}
+                  </Button>
+                  {esConfig && (
+                    <Button variant="outline" className="gap-2 text-destructive hover:text-destructive" onClick={handleDeleteEsConfig}>
+                      <Trash2 className="h-4 w-4" />
+                      Disconnect
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* Setup guide */}
+            <Card className="p-5 bg-secondary/10">
+              <h4 className="text-xs font-semibold text-foreground/80 mb-3">Setup Guide</h4>
+              <ol className="text-xs text-muted-foreground space-y-2 list-decimal list-inside">
+                <li>Create a free Elastic Cloud account at <code className="text-foreground/70 bg-secondary px-1 py-0.5 rounded">cloud.elastic.co</code></li>
+                <li>Create a deployment — any region works. The free tier is sufficient for getting started.</li>
+                <li>Copy the <strong className="text-foreground/80">Elasticsearch endpoint URL</strong> from your deployment details.</li>
+                <li>Use the <strong className="text-foreground/80">elastic</strong> superuser credentials, or create a dedicated API user.</li>
+                <li>Paste the credentials above and click <strong className="text-foreground/80">Connect Cluster</strong>.</li>
+                <li>Run a scan — data will automatically sync to your three indices: <code className="text-foreground/70 bg-secondary px-1 py-0.5 rounded">threatlens-scans</code>, <code className="text-foreground/70 bg-secondary px-1 py-0.5 rounded">threatlens-findings</code>, <code className="text-foreground/70 bg-secondary px-1 py-0.5 rounded">threatlens-audit</code>.</li>
+                <li>Open Kibana from your Elastic Cloud dashboard to build visualizations and alerts.</li>
+              </ol>
+            </Card>
           </TabsContent>
         </Tabs>
       </motion.div>

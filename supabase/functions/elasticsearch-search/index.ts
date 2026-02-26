@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,20 +11,52 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const esUrl = Deno.env.get('ELASTICSEARCH_URL');
-  const esUser = Deno.env.get('ELASTICSEARCH_USERNAME');
-  const esPass = Deno.env.get('ELASTICSEARCH_PASSWORD');
-
-  if (!esUrl || !esUser || !esPass) {
-    return new Response(JSON.stringify({ error: 'Elasticsearch not configured' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-
-  const esAuth = btoa(`${esUser}:${esPass}`);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     const { query, index, filters, size = 20, from = 0, aggs } = await req.json();
+
+    // Get user's ES config from auth
+    const authHeader = req.headers.get('authorization');
+    let esConfig: { esUrl: string; esAuth: string } | null = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+
+      if (user) {
+        const { data } = await supabase
+          .from('user_elasticsearch_config')
+          .select('elasticsearch_url, elasticsearch_username, elasticsearch_password, enabled')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (data?.enabled) {
+          esConfig = {
+            esUrl: data.elasticsearch_url,
+            esAuth: btoa(`${data.elasticsearch_username}:${data.elasticsearch_password}`),
+          };
+        }
+      }
+    }
+
+    if (!esConfig) {
+      return new Response(JSON.stringify({
+        error: 'Elasticsearch not configured. Add your cluster details in Settings.',
+        total: 0,
+        hits: [],
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { esUrl, esAuth } = esConfig;
 
     // Build search body
     const searchBody: any = { size, from };
@@ -45,7 +78,6 @@ serve(async (req) => {
         }
       };
 
-      // Apply filters
       if (filters?.severity) {
         searchBody.query.bool.filter.push({ term: { severity: filters.severity } });
       }
@@ -65,10 +97,8 @@ serve(async (req) => {
       searchBody.query = { match_all: {} };
     }
 
-    // Add sorting
     searchBody.sort = [{ _score: 'desc' }, { created_at: 'desc' }];
 
-    // Add highlight
     searchBody.highlight = {
       fields: {
         title: { number_of_fragments: 1 },
@@ -78,7 +108,6 @@ serve(async (req) => {
       post_tags: ['</mark>'],
     };
 
-    // Add aggregations if requested
     if (aggs) {
       searchBody.aggs = {};
       if (aggs.includes('severity')) {
