@@ -145,7 +145,7 @@ For comprehensive technical documentation covering every system flow, database s
 
 ## Live Demo
 
-View the live application here: **[https://intelligence-lens.lovable.app](https://intelligence-lens.lovable.app)**
+View the live application here: **[https://threatintellig.netlify.app/](https://threatintellig.netlify.app/)**
 
 ---
 
