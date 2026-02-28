@@ -53,7 +53,18 @@
     - 14.4 [Search Engine](#144-search-engine)
     - 14.5 [Global Search UI (Cmd+K)](#145-global-search-ui-cmdk)
     - 14.6 [Kibana Dashboards](#146-kibana-dashboards)
-15. [Conclusion](#15-conclusion)
+15. [Safe-Scanning Policy & Abuse Prevention](#15-safe-scanning-policy--abuse-prevention)
+    - 15.1 [AI Domain Gatekeeper](#151-ai-domain-gatekeeper)
+    - 15.2 [Rate Limiting](#152-rate-limiting)
+    - 15.3 [Consent Requirement](#153-consent-requirement)
+    - 15.4 [Immutable Audit Trail](#154-immutable-audit-trail)
+16. [Continuous Benchmarking](#16-continuous-benchmarking)
+    - 16.1 [Architecture](#161-architecture)
+    - 16.2 [Ground Truth Collection](#162-ground-truth-collection)
+    - 16.3 [Metrics Computed](#163-metrics-computed)
+    - 16.4 [Re-Validation Workflow](#164-re-validation-workflow)
+    - 16.5 [Benchmarking UI](#165-benchmarking-ui)
+17. [Conclusion](#17-conclusion)
 
 ---
 
@@ -1933,11 +1944,133 @@ With scan data indexed in Elasticsearch, Kibana provides powerful visualization 
 
 ---
 
-## 15. Conclusion
+## 15. Safe-Scanning Policy & Abuse Prevention
+
+ThreatLens enforces a multi-layered safe-scanning policy to prevent misuse of its reconnaissance capabilities. This section documents each control mechanism.
+
+### 15.1 AI Domain Gatekeeper
+
+Before any crawling begins, the `evaluate-domain` edge function classifies the target domain using Gemini 3 Flash Preview:
+
+- **ALLOW** — Public websites, businesses, SaaS products, educational institutions.
+- **BLOCK** — Government military/intelligence domains (.mil), critical infrastructure, healthcare patient portals, financial core banking systems.
+- **REVIEW** — Ambiguous domains flagged for manual analyst verification.
+
+Decisions are cached in the `domain_policies` table so repeat scans skip the AI call. Analysts can override any AI decision on the Policies page.
+
+### 15.2 Rate Limiting
+
+Per-user rate limiting is enforced via the `scan_quotas` table:
+
+| Control | Value |
+|---------|-------|
+| Default daily limit | 10 scans/user/day |
+| Enforcement point | `firecrawl-scan` edge function |
+| Reset mechanism | Automatic daily reset (date comparison) |
+| Visibility | Quota counter shown in ScanForm UI |
+
+When the limit is reached, the scan button remains functional but the backend returns HTTP 429 with a descriptive error message.
+
+### 15.3 Consent Requirement
+
+A mandatory consent checkbox is displayed in the `ScanForm` component. Users must explicitly acknowledge:
+
+1. They have authorization to scan the target domain
+2. Results will be used only for legitimate security assessment
+3. Scans are subject to rate limits and AI domain policy review
+
+The scan cannot be initiated without checking this box. The consent text links directly to the Policies page for transparency.
+
+### 15.4 Immutable Audit Trail
+
+Every domain evaluation generates an append-only entry in the `scan_audit_log` table:
+
+- **INSERT** policy exists (for logging)
+- **SELECT** policy exists (for viewing)
+- No **UPDATE** or **DELETE** policies — once logged, entries cannot be modified
+
+This provides a complete accountability trail for compliance and forensic review.
+
+---
+
+## 16. Continuous Benchmarking
+
+ThreatLens includes a built-in benchmarking system to continuously measure the accuracy of the AI domain policy gatekeeper. This ensures that the AI's allow/block/review decisions remain reliable over time.
+
+### 16.1 Architecture
+
+```mermaid
+flowchart TD
+    A["User scans domain"] --> B["evaluate-domain\nAI classifies: allow/block/review"]
+    B --> C["Auto-insert into\npolicy_benchmarks table"]
+    C --> D["Analyst reviews\non Benchmarking tab"]
+    D --> E{"Set ground truth\nallow/block/review"}
+    E --> F["Compute metrics\nPrecision, Recall, Accuracy"]
+    F --> G["Confusion Matrix\nPer-class breakdown"]
+```
+
+### 16.2 Ground Truth Collection
+
+Every AI domain evaluation automatically creates a row in the `policy_benchmarks` table:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `domain` | TEXT | The evaluated domain |
+| `ai_policy` | TEXT | What the AI decided (allow/block/review) |
+| `ground_truth` | TEXT | Analyst-verified correct decision (NULL until verified) |
+| `verified_by` | UUID | Which analyst verified this entry |
+| `verified_at` | TIMESTAMPTZ | When verification occurred |
+| `notes` | TEXT | Optional analyst notes |
+
+Analysts verify entries on the **Benchmarking** tab of the Policies page by clicking the correct label (allow/block/review) for each AI decision.
+
+### 16.3 Metrics Computed
+
+The system computes the following metrics from verified entries:
+
+**Overall Accuracy** — Percentage of AI decisions matching ground truth across all classes.
+
+**Per-Class Precision** — For each policy type (allow/block/review): of all domains the AI labeled as X, what fraction were actually X?
+
+$$\text{Precision}(X) = \frac{\text{True Positives for } X}{\text{Total AI predicted } X}$$
+
+**Per-Class Recall** — For each policy type: of all domains that should have been X, what fraction did the AI correctly identify?
+
+$$\text{Recall}(X) = \frac{\text{True Positives for } X}{\text{Total Ground Truth } X}$$
+
+**Confusion Matrix** — A 3×3 matrix showing AI predictions (rows) vs ground truth (columns), enabling analysts to identify systematic misclassifications (e.g., AI consistently labeling "review" domains as "allow").
+
+### 16.4 Re-Validation Workflow
+
+For periodic re-validation against ground truth:
+
+1. **Batch Review** — The Benchmarking tab shows all unverified AI evaluations sorted by recency. Analysts can rapidly verify entries by clicking allow/block/review buttons.
+2. **Drift Detection** — If overall accuracy drops below acceptable thresholds, the team can:
+   - Adjust the AI prompt in `evaluate-domain` to improve classification
+   - Add manual policies for commonly misclassified domain patterns
+   - Review the confusion matrix to identify specific failure modes
+3. **Historical Re-Evaluation** — Ground truth labels persist even if domain policies change, creating a permanent record of AI performance over time.
+
+### 16.5 Benchmarking UI
+
+The Policies page includes a **Benchmarking** tab with three sections:
+
+1. **Accuracy Metrics Card** — Shows overall accuracy percentage, verified/pending counts, and per-class precision and recall.
+2. **Confusion Matrix** — Visual 3×3 grid with correct predictions highlighted in green and misclassifications in red.
+3. **Verification Queue** — List of unverified AI evaluations with one-click ground truth labeling.
+
+<p align="center">
+  <img src="/docs/global-search-ui.png" alt="Global Search UI showing Elasticsearch-powered search with example queries for analysts" width="800" />
+</p>
+<p align="center"><em>Figure 5 — Global Search (⌘K): Elasticsearch-powered search interface with analyst-oriented example queries</em></p>
+
+---
+
+## 17. Conclusion
 
 ThreatLens represents a modern approach to automated threat intelligence that bridges the gap between manual penetration testing and fully automated security scanning. The architecture separates concerns cleanly — Firecrawl handles data acquisition, PostgreSQL provides persistence, Elasticsearch delivers enterprise search and analytics, and AI models deliver contextual analysis — while the React frontend presents everything through an intuitive, professional interface.
 
-The AI domain policy agent is a differentiating feature that addresses the ethical dimension of security scanning tools. By evaluating targets before scanning, ThreatLens ensures its capabilities are used responsibly while maintaining the speed and convenience that security professionals need.
+The AI domain policy agent is a differentiating feature that addresses the ethical dimension of security scanning tools. By evaluating targets before scanning, ThreatLens ensures its capabilities are used responsibly while maintaining the speed and convenience that security professionals need. Continuous benchmarking of AI decisions with precision/recall tracking ensures this gate remains accurate over time.
 
 Key architectural decisions:
 - **Serverless edge functions** for zero-infrastructure backend scaling
@@ -1945,6 +2078,8 @@ Key architectural decisions:
 - **Unified AI Gateway integration**: All functions route through the Lovable AI Gateway with auto-provisioned API keys
 - **Elasticsearch integration**: Automatic sync to Elastic Cloud for full-text search, Kibana dashboards, and enterprise analytics
 - **Global Search (⌘K)**: Command-palette search powered by Elasticsearch with fuzzy matching, filtering, and aggregations
+- **Safe-scanning policy**: AI gatekeeper + rate limiting + consent controls + immutable audit logging
+- **Continuous benchmarking**: Precision/recall tracking with analyst-verified ground truth and confusion matrices
 - **Profile-based access control** ensuring only registered users can operate the platform
 - **Immutable audit logging** for accountability and compliance
 - **Dark-mode cybersecurity aesthetic** with custom CSS design tokens, glass morphism, gradient text, and Framer Motion animations

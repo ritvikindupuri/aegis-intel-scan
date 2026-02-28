@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Globe, Loader2, ShieldAlert, ShieldX, ShieldCheck, Gauge } from "lucide-react";
+import { Search, Globe, Loader2, ShieldAlert, ShieldX, ShieldCheck, Gauge, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { startScan, evaluateDomain, getUserQuota } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -12,6 +13,7 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
   const [loading, setLoading] = useState(false);
   const [policyStatus, setPolicyStatus] = useState<{ policy: string; reason: string } | null>(null);
   const [quota, setQuota] = useState<{ scansToday: number; dailyLimit: number } | null>(null);
+  const [consentGiven, setConsentGiven] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -22,6 +24,15 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!domain.trim()) return;
+
+    if (!consentGiven) {
+      toast({
+        title: "Consent required",
+        description: "You must acknowledge the safe-scanning policy before initiating a scan.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     setPolicyStatus(null);
@@ -84,6 +95,28 @@ export function ScanForm({ onScanStarted }: { onScanStarted?: () => void }) {
           {loading ? "Evaluating..." : "Scan"}
         </Button>
       </form>
+
+      {/* Safe-Scanning Consent */}
+      <div className="flex items-start gap-2 px-1">
+        <Checkbox
+          id="scan-consent"
+          checked={consentGiven}
+          onCheckedChange={(checked) => setConsentGiven(checked === true)}
+          className="mt-0.5"
+        />
+        <label htmlFor="scan-consent" className="text-[11px] text-muted-foreground leading-tight cursor-pointer select-none">
+          <span className="font-medium text-foreground/70">Safe-Scanning Policy:</span>{" "}
+          I confirm I have authorization to scan this domain and will use results only for legitimate security assessment.
+          Scans are rate-limited to {quota?.dailyLimit ?? 10}/day and subject to{" "}
+          <button
+            type="button"
+            onClick={() => navigate("/policies")}
+            className="text-primary hover:underline font-medium"
+          >
+            AI domain policy review
+          </button>.
+        </label>
+      </div>
 
       {quota && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">

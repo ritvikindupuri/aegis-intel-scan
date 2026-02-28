@@ -124,6 +124,39 @@ export type Database = {
           },
         ]
       }
+      policy_benchmarks: {
+        Row: {
+          ai_policy: string
+          created_at: string
+          domain: string
+          ground_truth: string | null
+          id: string
+          notes: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          ai_policy: string
+          created_at?: string
+          domain: string
+          ground_truth?: string | null
+          id?: string
+          notes?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          ai_policy?: string
+          created_at?: string
+          domain?: string
+          ground_truth?: string | null
+          id?: string
+          notes?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

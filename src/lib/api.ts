@@ -397,3 +397,101 @@ export async function deleteElasticsearchConfig(): Promise<void> {
     .eq('user_id', user.id);
   if (error) throw error;
 }
+
+// --- Policy Benchmarking ---
+
+export interface BenchmarkEntry {
+  id: string;
+  domain: string;
+  ai_policy: string;
+  ground_truth: string | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BenchmarkMetrics {
+  total: number;
+  verified: number;
+  unverified: number;
+  precision: Record<string, number>;
+  recall: Record<string, number>;
+  accuracy: number;
+  confusionMatrix: Record<string, Record<string, number>>;
+}
+
+export async function getBenchmarkEntries(): Promise<BenchmarkEntry[]> {
+  const { data, error } = await supabase
+    .from('policy_benchmarks')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return (data || []) as unknown as BenchmarkEntry[];
+}
+
+export async function verifyBenchmark(id: string, groundTruth: string, notes?: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('policy_benchmarks')
+    .update({
+      ground_truth: groundTruth,
+      verified_by: user.id,
+      verified_at: new Date().toISOString(),
+      notes: notes || null,
+    })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export function computeBenchmarkMetrics(entries: BenchmarkEntry[]): BenchmarkMetrics {
+  const verified = entries.filter(e => e.ground_truth !== null);
+  const unverified = entries.filter(e => e.ground_truth === null);
+  const policies = ['allow', 'block', 'review'];
+
+  // Build confusion matrix
+  const matrix: Record<string, Record<string, number>> = {};
+  for (const p of policies) {
+    matrix[p] = {};
+    for (const gt of policies) {
+      matrix[p][gt] = 0;
+    }
+  }
+  for (const e of verified) {
+    if (matrix[e.ai_policy] && e.ground_truth) {
+      matrix[e.ai_policy][e.ground_truth] = (matrix[e.ai_policy][e.ground_truth] || 0) + 1;
+    }
+  }
+
+  // Precision: for each AI decision, how often was it correct?
+  const precision: Record<string, number> = {};
+  for (const p of policies) {
+    const predicted = verified.filter(e => e.ai_policy === p).length;
+    const correct = verified.filter(e => e.ai_policy === p && e.ground_truth === p).length;
+    precision[p] = predicted > 0 ? correct / predicted : 0;
+  }
+
+  // Recall: for each ground truth, how often did AI catch it?
+  const recall: Record<string, number> = {};
+  for (const p of policies) {
+    const actual = verified.filter(e => e.ground_truth === p).length;
+    const correct = verified.filter(e => e.ai_policy === p && e.ground_truth === p).length;
+    recall[p] = actual > 0 ? correct / actual : 0;
+  }
+
+  const totalCorrect = verified.filter(e => e.ai_policy === e.ground_truth).length;
+  const accuracy = verified.length > 0 ? totalCorrect / verified.length : 0;
+
+  return {
+    total: entries.length,
+    verified: verified.length,
+    unverified: unverified.length,
+    precision,
+    recall,
+    accuracy,
+    confusionMatrix: matrix,
+  };
+}
