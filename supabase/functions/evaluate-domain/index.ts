@@ -85,6 +85,12 @@ serve(async (req) => {
       user_id: userId,
     });
 
+    // 5. Log to benchmarks for continuous evaluation tracking
+    await supabase.from('policy_benchmarks').insert({
+      domain: cleanDomain,
+      ai_policy: aiDecision.policy,
+    });
+
     return new Response(JSON.stringify({
       allowed: aiDecision.policy === 'allow',
       policy: aiDecision.policy,
