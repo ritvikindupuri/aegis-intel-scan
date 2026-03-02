@@ -386,11 +386,22 @@ const Policies = () => {
                   </div>
 
                   {/* Confusion matrix — with analyst-friendly header */}
-                  <div className="space-y-2">
+                   <div className="space-y-3">
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Where does the AI get it wrong?</p>
-                    <p className="text-[11px] text-muted-foreground mb-1">
-                      Rows = what the AI decided · Columns = what the analyst verified as correct. <span className="text-emerald-400">Green diagonal</span> = correct decisions. <span className="text-red-400">Red off-diagonal</span> = mistakes.
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2">
+                      <span>📊 <strong className="text-foreground/80">Rows</strong> = AI's decision</span>
+                      <span className="hidden sm:inline text-border">|</span>
+                      <span>📋 <strong className="text-foreground/80">Columns</strong> = Analyst's verdict</span>
+                      <span className="hidden sm:inline text-border">|</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500/20 border border-emerald-500/40" />
+                        <span className="text-emerald-400">Correct</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500/20 border border-red-500/40" />
+                        <span className="text-red-400">Mistake</span>
+                      </span>
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="text-xs w-full">
                         <thead>
