@@ -305,73 +305,111 @@ const Policies = () => {
 
           {/* Benchmarking Tab */}
           <TabsContent value="benchmarks" className="space-y-4 mt-4">
+            {/* Explainer Card */}
+            <Card className="bg-card border-border border-primary/20">
+              <CardContent className="p-4 text-xs text-muted-foreground space-y-1.5">
+                <p className="text-foreground/90 font-medium text-sm">How does AI Benchmarking work?</p>
+                <p>Every time the AI evaluates a domain, its decision is logged here. You — the analyst — provide the <span className="text-foreground font-medium">correct answer</span> (ground truth). The system then compares AI decisions against your answers to calculate accuracy.</p>
+                <p>This lets the team measure <span className="text-foreground font-medium">how often the AI gets it right</span> and where it makes mistakes, so the scanning policy can be improved over time.</p>
+              </CardContent>
+            </Card>
+
             {/* Metrics Overview */}
             {metrics && metrics.verified > 0 && (
               <Card className="bg-card border-border">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <BarChart3 className="h-3.5 w-3.5 text-primary" /> AI Policy Accuracy Metrics
+                    <BarChart3 className="h-3.5 w-3.5 text-primary" /> AI Performance Scorecard
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Overall accuracy */}
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-mono font-bold text-primary">{formatPct(metrics.accuracy)}</div>
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Overall Accuracy</div>
+                <CardContent className="space-y-5">
+                  {/* Overall accuracy with progress bar */}
+                  <div className="space-y-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-medium">Overall Accuracy</span>
+                      <span className="text-2xl font-mono font-bold text-primary">{formatPct(metrics.accuracy)}</span>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-mono font-bold">{metrics.verified}</div>
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Verified</div>
+                    <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-500"
+                        style={{ width: `${Math.min(metrics.accuracy * 100, 100)}%` }}
+                      />
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-mono font-bold text-amber-400">{metrics.unverified}</div>
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Pending</div>
+                    <p className="text-[11px] text-muted-foreground">
+                      The AI agreed with analyst verdicts in <span className="font-mono text-foreground/80">{metrics.verified > 0 ? Math.round(metrics.accuracy * metrics.verified) : 0}</span> out of <span className="font-mono text-foreground/80">{metrics.verified}</span> verified evaluations.
+                      {metrics.unverified > 0 && <> There {metrics.unverified === 1 ? 'is' : 'are'} <span className="text-amber-400 font-mono">{metrics.unverified}</span> still awaiting your review.</>}
+                    </p>
+                  </div>
+
+                  {/* Per-class breakdown — analyst-friendly labels */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Breakdown by Decision Type</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {([
+                        { cls: 'allow', label: 'Allow', icon: ShieldCheck, color: 'text-emerald-400', barColor: 'bg-emerald-400', desc: 'Safe domains the AI approved' },
+                        { cls: 'block', label: 'Block', icon: ShieldX, color: 'text-red-400', barColor: 'bg-red-400', desc: 'Dangerous domains the AI rejected' },
+                        { cls: 'review', label: 'Review', icon: ShieldAlert, color: 'text-amber-400', barColor: 'bg-amber-400', desc: 'Ambiguous domains flagged for review' },
+                      ] as const).map(({ cls, label, icon: Icon, color, barColor, desc }) => {
+                        const prec = metrics.precision[cls];
+                        const rec = metrics.recall[cls];
+                        return (
+                          <div key={cls} className="p-3 rounded-lg bg-secondary/30 space-y-2.5">
+                            <div className="flex items-center gap-2">
+                              <Icon className={`h-4 w-4 ${color}`} />
+                              <span className="text-sm font-medium">{label}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <div>
+                                <div className="flex justify-between text-[11px] mb-0.5">
+                                  <span className="text-muted-foreground" title="When AI says this, how often is it correct?">Precision <span className="opacity-60">(correctness)</span></span>
+                                  <span className="font-mono text-foreground/80">{formatPct(prec)}</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                                  <div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${Math.min(prec * 100, 100)}%` }} />
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex justify-between text-[11px] mb-0.5">
+                                  <span className="text-muted-foreground" title="Of all domains that should be this, how many did the AI catch?">Recall <span className="opacity-60">(coverage)</span></span>
+                                  <span className="font-mono text-foreground/80">{formatPct(rec)}</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                                  <div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${Math.min(rec * 100, 100)}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed">{desc}</p>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Per-class precision/recall */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {['allow', 'block', 'review'].map(cls => (
-                      <div key={cls} className="p-3 rounded-lg bg-secondary/30 space-y-1">
-                        <div className="text-xs font-medium uppercase tracking-wider flex items-center gap-1.5">
-                          {cls === 'allow' ? <ShieldCheck className="h-3 w-3 text-emerald-400" /> :
-                           cls === 'block' ? <ShieldX className="h-3 w-3 text-red-400" /> :
-                           <ShieldAlert className="h-3 w-3 text-amber-400" />}
-                          {cls}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Precision: <span className="font-mono text-foreground/80">{formatPct(metrics.precision[cls])}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Recall: <span className="font-mono text-foreground/80">{formatPct(metrics.recall[cls])}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Confusion matrix */}
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Confusion Matrix (AI ↓ vs Ground Truth →)</p>
+                  {/* Confusion matrix — with analyst-friendly header */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Where does the AI get it wrong?</p>
+                    <p className="text-[11px] text-muted-foreground mb-1">
+                      Rows = what the AI decided · Columns = what the analyst verified as correct. <span className="text-emerald-400">Green diagonal</span> = correct decisions. <span className="text-red-400">Red off-diagonal</span> = mistakes.
+                    </p>
                     <div className="overflow-x-auto">
                       <table className="text-xs w-full">
                         <thead>
                           <tr>
-                            <th className="text-left p-1.5 text-muted-foreground">AI\Truth</th>
-                            {['allow', 'block', 'review'].map(gt => (
-                              <th key={gt} className="p-1.5 text-center text-muted-foreground">{gt}</th>
+                            <th className="text-left p-2 text-muted-foreground font-medium">AI decided ↓ \ Correct answer →</th>
+                            {['Allow', 'Block', 'Review'].map(gt => (
+                              <th key={gt} className="p-2 text-center text-muted-foreground font-medium">{gt}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {['allow', 'block', 'review'].map(ai => (
-                            <tr key={ai}>
-                              <td className="p-1.5 font-medium">{ai}</td>
+                            <tr key={ai} className="border-t border-border/30">
+                              <td className="p-2 font-medium capitalize">{ai}</td>
                               {['allow', 'block', 'review'].map(gt => {
                                 const val = metrics.confusionMatrix[ai]?.[gt] || 0;
                                 const isCorrect = ai === gt;
                                 return (
-                                  <td key={gt} className={`p-1.5 text-center font-mono ${isCorrect && val > 0 ? 'text-emerald-400 font-bold' : val > 0 ? 'text-red-400' : 'text-muted-foreground/40'}`}>
+                                  <td key={gt} className={`p-2 text-center font-mono text-sm ${isCorrect && val > 0 ? 'text-emerald-400 font-bold bg-emerald-400/5' : val > 0 ? 'text-red-400 font-semibold bg-red-400/5' : 'text-muted-foreground/30'}`}>
                                     {val}
                                   </td>
                                 );
@@ -382,6 +420,19 @@ const Policies = () => {
                       </table>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Show empty state when no verifications yet */}
+            {metrics && metrics.verified === 0 && (
+              <Card className="bg-card border-border border-dashed border-amber-500/30">
+                <CardContent className="p-6 text-center space-y-2">
+                  <BarChart3 className="h-8 w-8 text-amber-400 mx-auto" />
+                  <p className="text-sm font-medium">No accuracy data yet</p>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    Verify at least one AI evaluation below by clicking the correct decision. Once you do, precision, recall, and accuracy metrics will appear here.
+                  </p>
                 </CardContent>
               </Card>
             )}
