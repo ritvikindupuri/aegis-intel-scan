@@ -2,7 +2,7 @@
 
 ### Automated Threat Intelligence & Attack Surface Mapping Platform
 
-**By: Ritvik Induopuri**
+**By: Ritvik Indupuri**
 **Date: February 25, 2026**
 
 ---
